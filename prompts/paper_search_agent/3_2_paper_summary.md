@@ -16,6 +16,18 @@
 - **核心贡献**：论文最主要的创新点是什么？是提出了新模型、新算法、新数据集，还是新的理论视角？
 - **关键结果**：通过实验，论文得出了哪些关键的、可量化的结论？（例如：在某某任务上提升了X%的性能）
 
+### 2.1 回答下列问题
+
+- Feedback/Rewards Type of the agent (language or numerical)
+
+- Feedback/Rewards Source: How does the feedback/reward generated?
+
+- How to update models? (RL, SFT, In-Context Learning)
+
+- Which parts of models are updated (full paras, context, partial paras, tools)
+
+- When? (pre-testtime, testtime)
+
 ## 3. 方法详解 (Methodology Explained)
 - **技术路径**：简述作者为解决问题所采取的整体技术思路。
 - **模型/算法细节**：（这里请关注原文的部分）
@@ -46,7 +58,7 @@
 - 使用清晰的Markdown标题和列表。
 - 关键术语请使用 **粗体** 标出。
 - 所有数学公式必须使用 LaTeX 格式（例如：`$E=mc^2$` 或 `$$ \mathcal{L}_{total} = \mathcal{L}_{task} + \lambda \mathcal{L}_{reg} $$`）。
-- **【极其重要】为了确保 LaTeX 公式能被正确渲染，所有的反斜杠 `\` 必须被转义。这意味着你需要使用两个反斜杠 `\\` 来代替单个反斜杠。例如，`\frac{a}{b}` 必须写成 `\\\\frac{a}{b}`，`\theta` 必须写成 `\\\\theta`。
+- **【极其重要】使用标准 LaTeX 语法，确保公式能被正确渲染。例如：`$\frac{a}{b}$`、`$\theta$`、`$\alpha$` 等。
 
 使用标准 LaTeX 语法，不要使用任何非标准标记（如 标签）。
 确保公式中的符号、运算符、上下标和括号等符合 LaTeX 语法规范。

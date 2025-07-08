@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 import sys
 import hashlib
+import re
+import argparse
 
 # Add the project root to the Python path BEFORE local imports
 project_root = Path(__file__).resolve().parent.parent
@@ -19,14 +21,16 @@ setup_logging()
 import logging
 from datetime import datetime, timezone
 from tools.api.llm import call_llm
-from tools.patches.ddgs_patch import apply_ddgs_patch
+
 from tools.paper.search import find_paper_details
-from tools.paper.utils import _normalize_title
+from tools.paper.utils import _normalize_title, _get_config_for_step
 from tools.paper.analyze import analyze_paper
 from tools.trackers import update_usage
+import PyPDF2
 
-# Apply the patch as soon as the module is loaded
-apply_ddgs_patch()
+
+
+# --- Main Agent Logic ---
 
 def load_config():
     """Loads the YAML configuration file."""
@@ -62,6 +66,69 @@ def read_input_file(file_path: Path) -> str:
         logging.info(f"Created a dummy input file for you at '{file_path.name}'. Please edit it and run again.")
         return dummy_content
     return file_path.read_text()
+
+# --- Citation Extraction Mode Logic (NEW) ---
+
+def extract_text_from_pdf(pdf_path: Path) -> str:
+    """Extracts all text from a given PDF file."""
+    if not pdf_path.exists():
+        logging.error(f"PDF file not found at: {pdf_path}")
+        return ""
+    text = ""
+    try:
+        with open(pdf_path, 'rb') as f:
+            reader = PyPDF2.PdfReader(f)
+            for page in reader.pages:
+                text += page.extract_text() or ""
+    except Exception as e:
+        logging.error(f"Failed to read or parse PDF file: {e}")
+    return text
+
+def find_references_section(full_text: str) -> str:
+    """Isolates the 'References' section from the full text of a paper."""
+    match = re.search(r'(?is)(references|bibliography|参考文献)\n', full_text)
+    if match:
+        return full_text[match.start():]
+    logging.warning("Could not find a clear 'References' section. Using the last 20% of the document.")
+    return full_text[-int(len(full_text) * 0.20):]
+
+def extract_papers_from_citation(config: dict, pdf_path: Path, snippet: str) -> list:
+    """Extracts cited paper titles from a snippet using a source PDF."""
+    logging.info(f"Starting citation extraction from PDF: {pdf_path.name}")
+    full_text = extract_text_from_pdf(pdf_path)
+    if not full_text: return []
+    references_text = find_references_section(full_text)
+    if not references_text:
+        logging.error("Could not extract a references section from the PDF.")
+        return []
+
+    llm_config = _get_config_for_step(config, 'paper_search_agent', '0_extract_from_citation')
+    prompt_path = project_root / 'prompts' / 'paper_search_agent' / '0_extract_from_citation.md'
+    prompt_template = prompt_path.read_text()
+    
+    user_content = f"## Text Snippet:\n\n{snippet}\n\n---\n\n## Reference List:\n\n{references_text}"
+    messages = [{"role": "system", "content": prompt_template}, {"role": "user", "content": user_content}]
+    
+    logging.info(f"Calling model '{llm_config['model']}' to extract citations...")
+    message, _ = call_llm(llm_config, messages, is_json=True)
+    
+    if message and 'content' in message:
+        try:
+            data = json.loads(message['content'])
+            papers = data.get('papers', [])
+            if papers:
+                logging.info(f"Successfully extracted {len(papers)} cited papers.")
+                return [{'title': p} for p in papers] # Return in the format the main loop expects
+            else:
+                logging.warning("LLM returned a valid response, but no papers were extracted.")
+        except (json.JSONDecodeError, KeyError) as e:
+            logging.error(f"Error parsing LLM response for citation extraction: {e}")
+            logging.error(f"Raw response content: {message['content']}")
+    else:
+        logging.error("Failed to get a valid response from the LLM for citation extraction.")
+    return []
+
+# --- Main Execution Logic ---
 
 def format_input(config: dict, raw_text: str, usage_tracker: dict) -> list:
     """
@@ -108,10 +175,25 @@ def format_input(config: dict, raw_text: str, usage_tracker: dict) -> list:
 
 def main():
     """Main execution flow of the paper search agent."""
+    parser = argparse.ArgumentParser(description="Nana Paper Search Agent")
+    parser.add_argument(
+        '--mode', 
+        type=str, 
+        default='from_file', 
+        choices=['from_file', 'from_citation'],
+        help="The input mode for the agent."
+    )
+    parser.add_argument('--pdf', type=str, help="Path to the source PDF file (for 'from_citation' mode).")
+    parser.add_argument('--snippet', type=str, help="Text snippet with citations (for 'from_citation' mode).")
+    args = parser.parse_args()
+
     config = load_config()
     usage_tracker = {}
     
-    # Setup paths and cache
+    # Counters for the final report
+    cached_details_count = 0
+    cached_analysis_count = 0
+    
     agent_name = Path(__file__).stem
     agent_storage_path = project_root / 'storage' / agent_name
     agent_storage_path.mkdir(parents=True, exist_ok=True)
@@ -121,48 +203,42 @@ def main():
     # --- One-time cache migration ---
     migrated = False
     for key, value in cache.items():
-        # Migrate absolute summary_path to relative
         if 'summary_path' in value and value['summary_path'] and Path(value['summary_path']).is_absolute():
             value['summary_path'] = str(Path(value['summary_path']).relative_to(project_root))
             migrated = True
-        # Add collected_at timestamp if missing
         if 'collected_at' not in value:
-            # Try to get it from file modification time for better accuracy
             summary_mtime = datetime.fromtimestamp(0, timezone.utc)
             if 'summary_path' in value and value['summary_path']:
                 try:
-                    summary_mtime = datetime.fromtimestamp(
-                        (project_root / value['summary_path']).stat().st_mtime,
-                        timezone.utc
-                    )
+                    summary_mtime = datetime.fromtimestamp((project_root / value['summary_path']).stat().st_mtime, timezone.utc)
                 except (FileNotFoundError, TypeError):
-                    pass # Use epoch if file not found or path is not a string
+                    pass
             value['collected_at'] = summary_mtime.isoformat()
             migrated = True
-
     if migrated:
-        logging.info("Performed one-time migration on cache.json to add timestamps and use relative paths.")
+        logging.info("Performed one-time migration on cache.json.")
     # --- End migration ---
+    
+    paper_list = []
+    if args.mode == 'from_file':
+        logging.info("Running in 'from_file' mode.")
+        input_file_path = project_root / 'agents' / f'{agent_name}.in'
+        raw_input_text = read_input_file(input_file_path)
+        if raw_input_text.strip():
+            paper_list = format_input(config, raw_input_text, usage_tracker)
+    elif args.mode == 'from_citation':
+        logging.info("Running in 'from_citation' mode.")
+        if not args.pdf or not args.snippet:
+            logging.error("--pdf and --snippet arguments are required for 'from_citation' mode.")
+            return
+        pdf_path = Path(args.pdf)
+        paper_list = extract_papers_from_citation(config, pdf_path, args.snippet)
 
-    input_file_path = project_root / 'agents' / f'{agent_name}.in'
-    
-    # Counters for the final report
-    cached_details_count = 0
-    cached_analysis_count = 0
-    
-    # Step 1: Format Input
-    raw_input_text = read_input_file(input_file_path)
-    if not raw_input_text.strip():
-        logging.info("Input file is empty. Exiting.")
-        return
-        
-    paper_list = format_input(config, raw_input_text, usage_tracker)
-    
     if not paper_list:
-        logging.error("Could not format paper list. Aborting.")
+        logging.error("Could not generate a paper list to process. Aborting.")
         return
         
-    logging.info("\n--- Formatted Paper List ---")
+    logging.info("\n--- Papers to Process ---")
     logging.info(json.dumps(paper_list, indent=2))
     logging.info("--------------------------\n")
 
@@ -175,18 +251,35 @@ def main():
     for paper in paper_list:
         logging.info(f"\nProcessing: {paper['title']}")
         cache_key = _normalize_title(paper['title'])
+        provided_url = paper.get('url', '').strip() if paper.get('url') else None
         
-        if cache_key in cache and 'pdf_url' in cache[cache_key]:
+        # Check if we should use cache or update with new URL
+        use_cache = (
+            cache_key in cache and 
+            'pdf_url' in cache[cache_key] and 
+            cache[cache_key]['pdf_url'] and  # Cache has valid PDF URL
+            not provided_url  # No new URL provided
+        )
+        
+        if use_cache:
             logging.info("Found paper details in cache.")
             paper.update(cache[cache_key])
             recalled_papers.append(paper)
             cached_details_count += 1
             continue
+        
+        # If URL is provided or cache is missing/incomplete, get/update details
+        if provided_url and cache_key in cache:
+            logging.info("Updating cached paper with provided URL.")
+        elif provided_url:
+            logging.info("Using provided URL for new paper.")
+        else:
+            logging.info("No URL provided, searching for paper details.")
 
         details = find_paper_details(paper, config, usage_tracker)
         if details:
             paper.update(details)
-            # Add collected_at timestamp FOR NEW ENTRIES
+            # Add/update collected_at timestamp
             details['collected_at'] = datetime.now(timezone.utc).isoformat()
             cache[cache_key] = details
             recalled_papers.append(paper)
@@ -195,7 +288,8 @@ def main():
 
     logging.info("\n--- Recall Results ---")
     logging.info(f"Successfully found details for: {len(recalled_papers)} paper(s)")
-    logging.warning(f"Failed to find details for: {len(failed_recall)} paper(s)")
+    if failed_recall:
+        logging.warning(f"Failed to find details for: {len(failed_recall)} paper(s)")
     logging.info("----------------------\n")
 
     # Step 3: Analyze Papers
@@ -215,10 +309,11 @@ def main():
         
         analysis_results = analyze_paper(paper, config, usage_tracker)
         if analysis_results:
-            # Save results to hashed directory
-            paper_hash = hashlib.sha1(paper['arxiv_id'].encode()).hexdigest()[:10]
-            paper_dir = agent_storage_path / paper_hash
-            paper_dir.mkdir(exist_ok=True)
+            # Save results to a date-based, human-readable directory
+            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            paper_id = paper.get('arxiv_id', 'unknown_id')
+            paper_dir = agent_storage_path / today_str / paper_id
+            paper_dir.mkdir(parents=True, exist_ok=True)
             
             summary_path = paper_dir / 'summary.md'
             
@@ -239,6 +334,10 @@ def main():
 
             # Now, update the entry with the summary path.
             cache[cache_key]['summary_path'] = str(relative_summary_path)
+            cache[cache_key]['collected_at'] = datetime.now(timezone.utc).isoformat()
+            
+            # Save cache immediately after each analysis
+            save_cache(cache_path, cache)
             
             analyzed_papers.append(paper)
         else:

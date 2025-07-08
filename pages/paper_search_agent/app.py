@@ -2,6 +2,7 @@ import gradio as gr
 import json
 from pathlib import Path
 import pandas as pd
+from datetime import datetime
 
 # Define project paths, adjusting for the new file location
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -21,27 +22,60 @@ CUSTOM_CSS = """
     font-size: 1em; /* Set to the base body font size */
     font-weight: 600; /* Keep headers bold for structure */
 }
+/* Style for the refresh button */
+.refresh-button {
+    margin-bottom: 1rem;
+}
 """
 
+def format_collection_time(collected_at_str):
+    """Format collection time for display."""
+    if not collected_at_str:
+        return "Unknown"
+    
+    try:
+        # Parse ISO format datetime
+        dt = datetime.fromisoformat(collected_at_str.replace('Z', '+00:00'))
+        # Format as readable date
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except:
+        return "Unknown"
+
 def load_data():
-    """Loads, sorts, and prepares the paper data for display."""
+    """Loads, sorts, and prepares the paper data for display. Only includes papers with summaries."""
     if not CACHE_FILE.exists():
-        return pd.DataFrame(columns=["display_title", "title"]), {}
+        return pd.DataFrame(columns=["display_title", "title", "collected_at"]), {}
     
     with open(CACHE_FILE, 'r') as f:
         # The cache is pre-sorted by the agent, so we load it as is.
         cache_data = json.load(f)
 
     papers = []
-    for _, paper in cache_data.items():
-        display_title = f"[{paper.get('arxiv_id', 'N/A')}] {paper.get('title', 'No Title')}"
-        papers.append({
-            "display_title": display_title,
-            "title": paper.get('title', 'No Title'), # Keep original title for lookup
-        })
+    filtered_cache = {}
+    
+    for key, paper in cache_data.items():
+        # Only include papers that have a summary_path
+        summary_path_str = paper.get('summary_path')
+        if summary_path_str:
+            summary_path = PROJECT_ROOT / summary_path_str
+            # Also check that the summary file actually exists
+            if summary_path.exists():
+                collected_at = paper.get('collected_at', '')
+                formatted_time = format_collection_time(collected_at)
+                
+                display_title = f"[{paper.get('arxiv_id', 'N/A')}] {paper.get('title', 'No Title')} | 📅 {formatted_time}"
+                papers.append({
+                    "display_title": display_title,
+                    "title": paper.get('title', 'No Title'),
+                    "collected_at": collected_at or "1970-01-01T00:00:00+00:00"  # Default old date for sorting
+                })
+                filtered_cache[key] = paper
 
+    # Sort by collection time in descending order (newest first)
+    papers.sort(key=lambda x: x["collected_at"], reverse=True)
+    
     df = pd.DataFrame(papers)
-    return df, cache_data # Return df for display, and full cache for lookups
+    return df, filtered_cache # Return df for display, and filtered cache for lookups
 
 def search_papers(df, keyword):
     """Filters the dataframe based on a keyword."""
@@ -58,9 +92,13 @@ def get_paper_content(selected_display_title: str, cache_data: dict):
         return "### Select a paper to view its PDF.", "### Select a paper to view its summary."
 
     # Find the full paper details from the cache using the display title
+    # Need to reconstruct the display title to match
     paper_details = None
     for paper in cache_data.values():
-        display_title = f"[{paper.get('arxiv_id', 'N/A')}] {paper.get('title', 'No Title')}"
+        collected_at = paper.get('collected_at', '')
+        formatted_time = format_collection_time(collected_at)
+        display_title = f"[{paper.get('arxiv_id', 'N/A')}] {paper.get('title', 'No Title')} | 📅 {formatted_time}"
+        
         if display_title == selected_display_title:
             paper_details = paper
             break
@@ -84,14 +122,47 @@ def get_paper_content(selected_display_title: str, cache_data: dict):
 
     return pdf_viewer_html, summary_content
 
+def refresh_data():
+    """Reloads the paper data and returns updated components."""
+    df, cache_data = load_data()
+    choices = df["display_title"].tolist()
+    paper_count = len(choices)
+    
+    # Return the new choices and updated info message
+    return (
+        gr.Dropdown(choices=choices, value=None),  # Updated dropdown
+        cache_data,  # Updated cache state
+        f"🔄 Refreshed! Found {paper_count} papers with summaries (sorted by collection time).",  # Status message
+        "### Select a paper from the search bar above.",  # Reset PDF viewer
+        "### Select a paper from the search bar above."   # Reset summary viewer
+    )
+
 # --- Gradio App ---
 with gr.Blocks(theme=gr.themes.Soft(), title="Paper Research Interface", css=CUSTOM_CSS) as demo:
+    # Inject MathJax for LaTeX rendering
+    gr.HTML("""
+    <script>
+    window.MathJax = {
+      tex: {inlineMath: [['$', '$'], ['\\\(', '\\\)']]},
+      svg: {fontCache: 'global'}
+    };
+    </script>
+    <script src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js'></script>
+    """)
+
     # Store data in the app state for performance
     initial_df, full_cache = load_data()
     state_cache = gr.State(full_cache)
 
     gr.Markdown("# Paper Research Interface")
-    gr.Markdown("Search for papers collected by the agent. Select a paper to view its PDF and AI-generated summary.")
+    gr.Markdown("Search for papers collected by the agent. Only papers with AI-generated summaries are shown. Papers are sorted by collection time (newest first).")
+    
+    # Add refresh functionality
+    with gr.Row():
+        with gr.Column(scale=0.8):
+            refresh_status = gr.Markdown(f"📊 Currently showing {len(initial_df)} papers with summaries (sorted by collection time).")
+        with gr.Column(scale=0.2):
+            refresh_button = gr.Button("🔄 Refresh Papers", elem_classes=["refresh-button"])
     
     # A single dropdown for both searching and selecting papers
     search_dropdown = gr.Dropdown(
@@ -100,7 +171,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Paper Research Interface", css=CUS
         value=None,
         interactive=True,
         max_choices=10,
-        info="Type to search for a paper by its ID or title. The list will filter as you type."
+        info="Type to search for a paper by its ID, title, or collection date. Papers are sorted by collection time (newest first)."
     )
 
     # Side-by-side layout for the PDF and summary
@@ -117,6 +188,14 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Paper Research Interface", css=CUS
         fn=get_paper_content,
         inputs=[search_dropdown, state_cache],
         outputs=[pdf_viewer, summary_viewer],
+        queue=True
+    )
+    
+    # Event handler for refresh button
+    refresh_button.click(
+        fn=refresh_data,
+        inputs=[],
+        outputs=[search_dropdown, state_cache, refresh_status, pdf_viewer, summary_viewer],
         queue=True
     )
 

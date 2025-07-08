@@ -38,14 +38,12 @@ llms:
 # defined in the 'llms' section above.
 agents:
   paper_search_agent:
-    # Step 1: Formats the raw text from the input file into a structured list.
-    # Recommended: A fast and cheap model.
-    1_input_formatting: gpt-4o-mini
+    0_extract_from_citation: some_gpt
+    1_input_formatting: some_gpt
+    2_recall_papers: some_gpt
+    3_2_paper_summary: some_gpt
 
-    # Step 2: Judges the best paper match from search results.
-    # Recommended: A fast and cheap model.
-    2_recall_papers: gpt-4o-mini
-
-    # Step 3: Reads a full paper and generates a detailed summary.
-    # Recommended: A powerful and accurate model.
-    3_2_paper_summary: gemini-flash
+  citation_extraction_agent:
+    # Step 1: Reads a PDF's reference section and a text snippet to extract cited papers.
+    # Recommended: A model with good JSON formatting and instruction-following capabilities.
+    1_extract_references: gpt-4o-mini

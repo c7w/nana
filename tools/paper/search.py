@@ -1,154 +1,135 @@
-import requests
-import arxiv
-from pathlib import Path
-import re
-import json
-import sys
-from ddgs import DDGS
+"""
+Paper search functionality using combined arXiv + OpenAlex strategy.
+"""
+
 import logging
-
-# Add the project root to the Python path
-project_root = Path(__file__).resolve().parents[2] # Adjust path for new location
-sys.path.append(str(project_root))
-
-from tools.api.llm import call_llm
+import traceback
+import json
 from tools.paper.utils import _normalize_title
-from ddgs import DDGS
-from .utils import _get_config_for_step
-from ..trackers import update_usage
+from tools.trackers import update_usage
+from tools.paper.search_openalex import combined_search_with_llm_fallback
+from pathlib import Path
 
-def _clean_filename(title: str) -> str:
-    """Removes invalid characters from a string to make it a valid filename."""
-    s = re.sub(r'[\\/*?:"<>|]', "", title)
-    return (s[:100] + '..') if len(s) > 100 else s
+# Get project root for prompt loading
+import sys
+project_root = Path(__file__).resolve().parents[2]
 
-def _get_best_match_from_results(query_title: str, results: list, config: dict, usage_tracker: dict) -> arxiv.Result | None:
-    """Uses rules and an LLM to find the best match from a list of search results."""
+def find_paper_details(paper: dict, config: dict, usage_tracker: dict) -> dict:
+    """
+    Finds detailed information about a paper including PDF URL and arXiv ID.
+    If a URL is provided in the input, use it directly; otherwise use combined search.
+    """
+    title = paper.get('title', '').strip()
+    provided_url = paper.get('url', '').strip() if paper.get('url') else None
     
-    # --- Strategy 1: Rule-based exact match ---
-    normalized_query = _normalize_title(query_title)
-    for i, result in enumerate(results):
-        normalized_result_title = _normalize_title(result.title)
-        if normalized_query == normalized_result_title:
-            logging.info(f"Found rule-based exact match at index {i+1}: '{result.title}'")
-            return result
-    
-    # --- Strategy 2: LLM-based semantic match (as the final fallback) ---
-    logging.info("No exact match found. Asking LLM judge as a fallback...")
-    step_config_name = '2_recall_papers'
-    agent_config = config['agents'].get('paper_search_agent', {})
-    if step_config_name not in agent_config:
-        logging.warning("LLM judge for paper recall not configured. Picking first result.")
-        return results[0] if results else None
+    if not title:
+        logging.error("Cannot search for paper without title")
+        return {}
 
-    llm_name = agent_config[step_config_name]
-    llm_config = config['llms'][llm_name]
+    logging.info(f"Searching for: {title}")
     
-    prompt_path = project_root / 'prompts' / 'paper_search_agent' / f'{step_config_name}.md'
-    prompt_template = prompt_path.read_text()
+    # If URL is provided, use it directly
+    if provided_url:
+        logging.info(f"Using provided URL: {provided_url}")
+        return _use_provided_url(title, provided_url)
+
+    try:
+        # Use the new combined search strategy
+        result = combined_search_with_llm_fallback(title, max_results_per_source=10)
+        
+        if result:
+            # Format the result in the expected structure
+            formatted_result = _format_result(result)
+            logging.info(f"✓ Successfully found paper via combined search")
+            return formatted_result
+        else:
+            logging.error(f"No suitable match found for: {title}")
+            return {}
+        
+    except Exception as e:
+        logging.error(f"Error during paper search: {e}")
+        logging.error(traceback.format_exc())
+        return {}
+
+def _use_provided_url(title: str, url: str) -> dict:
+    """
+    Use the URL provided by the user to generate paper details.
+    Attempts to extract arXiv ID and generate PDF URL from the provided URL.
+    """
+    import re
     
-    formatted_results = "\n".join([f"{i+1}. {result.title}" for i, result in enumerate(results)])
-    user_content = f"Original Query: `{query_title}`\n\nSearch Results:\n{formatted_results}"
+    arxiv_id = None
+    pdf_url = None
+    doi = None
     
-    messages = [
-        {"role": "system", "content": prompt_template},
-        {"role": "user", "content": user_content}
+    # Extract arXiv ID from various URL patterns
+    arxiv_patterns = [
+        r'arxiv\.org/abs/(\d+\.\d+)',
+        r'arxiv\.org/pdf/(\d+\.\d+)',
+        r'arxiv\.org/(?:abs|pdf)/(\d+\.\d+)(?:v\d+)?(?:\.pdf)?'
     ]
-
-    logging.info(f"Asking LLM judge ('{llm_config['model']}') to pick the best match...")
-    message, usage = call_llm(llm_config, messages, is_json=True)
-
-    update_usage(usage_tracker, llm_config, usage)
-
-    if message and 'content' in message:
-        try:
-            data = json.loads(message['content'])
-            index = int(data.get("best_match_index", 0))
-            logging.info(f"LLM judge picked index: {index}")
-            if index > 0 and index <= len(results):
-                return results[index - 1]
-            return None
-        except (json.JSONDecodeError, ValueError, KeyError):
-            logging.error(f"Error parsing LLM judge response: {message['content']}")
-            return None
     
-    return None
-
-
-def find_paper_details(paper_info: dict, config: dict, usage_tracker: dict) -> dict | None:
-    """
-    Finds the correct paper metadata (incl. PDF URL) using a multi-step search strategy.
-    """
-    title = paper_info.get('title', 'untitled')
-    url = paper_info.get('url')
+    for pattern in arxiv_patterns:
+        match = re.search(pattern, url)
+        if match:
+            arxiv_id = match.group(1)
+            break
     
-    # --- Step 1: Handle provided ArXiv URL ---
-    if url and 'arxiv.org' in url:
-        try:
-            arxiv_id = arxiv.Client().get_query(id_list=[url.split('/')[-1]])[0].entry_id
-            pdf_url = url.replace('/abs/', '/pdf/') if '/abs/' in url else url
-            logging.info(f"Successfully derived details from provided ArXiv URL for '{title}'")
-            return {'title': title, 'pdf_url': pdf_url, 'arxiv_id': arxiv_id.split('/')[-1]}
-        except Exception as e:
-            logging.warning(f"Could not resolve provided ArXiv URL {url}: {e}")
-
-    # --- Step 2: Multi-source search and verification ---
-    all_results = []
-    processed_ids = set()
-
-    # --- Source A: Direct ArXiv Search ---
-    logging.info(f"Searching ArXiv for title: '{title}'")
-    try:
-        arxiv_search = arxiv.Search(query=title, max_results=5)
-        for r in arxiv_search.results():
-            if r.entry_id not in processed_ids:
-                all_results.append(r)
-                processed_ids.add(r.entry_id)
-    except Exception as e:
-        logging.error(f"An error occurred during ArXiv search: {e}")
-
-    # --- Source B: DuckDuckGo Fallback Search ---
-    logging.info("Searching DuckDuckGo as a fallback...")
-    try:
-        # Use quotes for an exact phrase search to improve accuracy
-        ddgs_results = DDGS().text(f'{title} site:arxiv.org', max_results=5)
-        
-        # Find all /abs/ or /pdf/ links from the results
-        arxiv_urls_from_ddgs = [r['href'] for r in ddgs_results if 'arxiv.org/abs/' in r.get('href', '') or 'arxiv.org/pdf/' in r.get('href', '')]
-        
-        if arxiv_urls_from_ddgs:
-            # Cleanly extract IDs from the URLs, removing .pdf and version numbers
-            raw_ids = [url.split('/')[-1] for url in arxiv_urls_from_ddgs]
-            cleaned_ids = [re.sub(r'v\d+$|\.pdf$', '', id_str) for id_str in raw_ids]
-            
-            # Fetch details for unique, new IDs
-            ddgs_ids_to_fetch = list(set(id for id in cleaned_ids if id not in processed_ids))
-
-            if ddgs_ids_to_fetch:
-                logging.info(f"Found {len(ddgs_ids_to_fetch)} new ArXiv links from DuckDuckGo. Fetching details...")
-                ddgs_arxiv_results = arxiv.Search(id_list=ddgs_ids_to_fetch).results()
-                for r in ddgs_arxiv_results:
-                     if r.entry_id not in processed_ids:
-                        all_results.append(r)
-                        processed_ids.add(r.entry_id)
-    except Exception as e:
-        logging.error(f"An error occurred during DuckDuckGo search: {e}")
+    # If we found arXiv ID, generate PDF URL
+    if arxiv_id:
+        pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+        logging.info(f"  ✓ Extracted arXiv ID from URL: {arxiv_id}")
+        logging.info(f"  ✓ Generated PDF URL: {pdf_url}")
+    else:
+        # If not arXiv, check if it's already a PDF URL
+        if url.endswith('.pdf') or 'pdf' in url.lower():
+            pdf_url = url
+            logging.info(f"  ✓ Using provided PDF URL: {pdf_url}")
+        else:
+            # Try to convert to PDF URL for common patterns
+            if 'arxiv.org/abs/' in url:
+                pdf_url = url.replace('/abs/', '/pdf/') + '.pdf'
+                logging.info(f"  ✓ Converted abs URL to PDF: {pdf_url}")
+            else:
+                # Use as-is, might be a direct PDF link
+                pdf_url = url
+                logging.info(f"  ✓ Using URL as PDF: {pdf_url}")
     
-    if not all_results:
-        logging.warning(f"All search attempts failed for '{title}'.")
-        return None
+    return {
+        'title': title,
+        'authors': [],  # Unknown from URL alone
+        'publication_year': None,  # Unknown from URL alone
+        'doi': doi,
+        'pdf_url': pdf_url,
+        'arxiv_id': arxiv_id,
+        'search_engine': 'provided_url'
+    }
 
-    # --- Final Verification ---
-    logging.info(f"Found a total of {len(all_results)} unique candidates. Verifying...")
-    chosen_paper = _get_best_match_from_results(title, all_results, config, usage_tracker)
+def _format_result(result: dict) -> dict:
+    """Format the result in the expected structure."""
+    arxiv_id = result.get('arxiv_id')
+    pdf_url = result.get('pdf_url')
+    doi = result.get('doi')
     
-    if chosen_paper:
-        logging.info(f"Confirmed match: '{chosen_paper.title}'")
-        return {
-            'title': chosen_paper.title,
-            'pdf_url': chosen_paper.pdf_url,
-            'arxiv_id': chosen_paper.entry_id.split('/')[-1].split('v')[0] # Clean version numbers
-        }
+    # Try to extract arXiv ID from DOI if not already present
+    if not arxiv_id and doi:
+        import re
+        arxiv_match = re.search(r'arxiv\.(\d+\.\d+)', doi)
+        if arxiv_match:
+            arxiv_id = arxiv_match.group(1)
+            logging.info(f"  ✓ Extracted arXiv ID from DOI: {arxiv_id}")
     
-    logging.warning(f"Could not confirm a final match for '{title}'.")
-    return None 
+    # Generate PDF URL from arXiv ID if not already present
+    if arxiv_id and not pdf_url:
+        pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
+        logging.info(f"  ✓ Generated PDF URL from arXiv ID: {pdf_url}")
+    
+    return {
+        'title': result.get('title', ''),
+        'authors': result.get('authors', []),
+        'publication_year': result.get('publication_year'),
+        'doi': doi,
+        'pdf_url': pdf_url,
+        'arxiv_id': arxiv_id,
+        'search_engine': f"combined_{result.get('source', 'unknown')}"
+    } 
