@@ -3,3 +3,4 @@ storage/
 config.yaml
 __pycache__/
 .gradio/
+*.out

@@ -110,11 +110,20 @@ def find_paper_details(paper_info: dict, config: dict, usage_tracker: dict) -> d
     # --- Source B: DuckDuckGo Fallback Search ---
     logging.info("Searching DuckDuckGo as a fallback...")
     try:
-        ddgs_results = DDGS().text(f'"{title}" site:arxiv.org', max_results=5)
-        arxiv_urls_from_ddgs = [r['href'] for r in ddgs_results if 'arxiv.org/abs' in r.get('href', '')]
+        # Use quotes for an exact phrase search to improve accuracy
+        ddgs_results = DDGS().text(f'{title} site:arxiv.org', max_results=5)
+        
+        # Find all /abs/ or /pdf/ links from the results
+        arxiv_urls_from_ddgs = [r['href'] for r in ddgs_results if 'arxiv.org/abs/' in r.get('href', '') or 'arxiv.org/pdf/' in r.get('href', '')]
+        
         if arxiv_urls_from_ddgs:
-            ddgs_ids = [url.split('/')[-1] for url in arxiv_urls_from_ddgs]
-            ddgs_ids_to_fetch = [i for i in ddgs_ids if i not in processed_ids]
+            # Cleanly extract IDs from the URLs, removing .pdf and version numbers
+            raw_ids = [url.split('/')[-1] for url in arxiv_urls_from_ddgs]
+            cleaned_ids = [re.sub(r'v\d+$|\.pdf$', '', id_str) for id_str in raw_ids]
+            
+            # Fetch details for unique, new IDs
+            ddgs_ids_to_fetch = list(set(id for id in cleaned_ids if id not in processed_ids))
+
             if ddgs_ids_to_fetch:
                 logging.info(f"Found {len(ddgs_ids_to_fetch)} new ArXiv links from DuckDuckGo. Fetching details...")
                 ddgs_arxiv_results = arxiv.Search(id_list=ddgs_ids_to_fetch).results()

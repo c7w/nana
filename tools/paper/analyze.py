@@ -86,20 +86,20 @@ def analyze_paper(paper_info: dict, config: dict, usage_tracker: dict) -> dict |
         }
     ]
     logging.info(f"Requesting summary from '{summary_llm_config['model']}'...")
-    summary_message, usage = call_llm(summary_llm_config, summary_messages, plugins=plugins)
+    message, usage = call_llm(summary_llm_config, summary_messages, is_json=False)
     
     update_usage(usage_tracker, summary_llm_config, usage)
 
-    if summary_message:
-        try:
-            analysis_data = json.loads(summary_message['content'])
+    if message and 'content' in message:
+        analysis_content = message['content']
+        # The prompt asks for a structured markdown, so we just check for content.
+        if analysis_content.strip():
             logging.info(f"Successfully analyzed '{paper_info['title']}'.")
             return {
-                'summary': analysis_data.get('summary', 'No summary provided.'),
+                'summary': analysis_content,
             }
-        except json.JSONDecodeError:
-            logging.error(f"Failed to parse analysis JSON for '{paper_info['title']}'.")
-            logging.error(f"Raw response: {summary_message['content']}")
+        else:
+            logging.error(f"LLM returned an empty analysis for '{paper_info['title']}'.")
             return None
     
     logging.error(f"LLM analysis failed for '{paper_info['title']}'.")

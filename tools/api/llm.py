@@ -38,7 +38,15 @@ def call_llm(llm_config: dict, messages: list, is_json: bool = False, plugins: l
     try:
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
-        response_data = response.json()
+        
+        # Handle JSON decoding separately to log the problematic response text
+        try:
+            response_data = response.json()
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to decode JSON response from LLM API. Error: {e}")
+            logging.error(f"--- Raw Response Text ---\n{response.text}")
+            return None, None
+
         content = response_data['choices'][0]['message'] if response_data.get('choices') else None
         usage = response_data.get('usage', {})
         return content, usage

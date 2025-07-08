@@ -7,14 +7,17 @@ import json
 from pathlib import Path
 import sys
 import hashlib
-import logging
-from datetime import datetime, timezone
-from tools.log_config import setup_logging
 
-# Add the project root to the Python path to allow importing from 'tools'
+# Add the project root to the Python path BEFORE local imports
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
+# Setup logging as the very first thing to ensure it's configured
+from tools.log_config import setup_logging
+setup_logging()
+
+import logging
+from datetime import datetime, timezone
 from tools.api.llm import call_llm
 from tools.patches.ddgs_patch import apply_ddgs_patch
 from tools.paper.search import find_paper_details
@@ -105,7 +108,6 @@ def format_input(config: dict, raw_text: str, usage_tracker: dict) -> list:
 
 def main():
     """Main execution flow of the paper search agent."""
-    setup_logging()
     config = load_config()
     usage_tracker = {}
     
