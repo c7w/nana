@@ -1,0 +1,51 @@
+# -----------------------------------------------------------------------------
+# नाना (nana) Project Configuration Template
+#
+# Instructions:
+# 1. Rename this file from 'config.template.yaml' to 'config.yaml'.
+# 2. Fill in the placeholder values below with your actual API keys and preferences.
+# -----------------------------------------------------------------------------
+
+# --- Large Language Model (LLM) Configurations ---
+# Define the different LLMs you want to use in your agents. You can add as many
+# as you like. The key for each model (e.g., 'my_gpt_model') is a friendly name
+# you will use to reference it in the 'agents' section below.
+llms:
+  # Example configuration for a model from OpenRouter
+  # You can find model names and costs at https://openrouter.ai/models
+  gpt-4o-mini:
+    base_url: https://openrouter.ai/api/v1
+    api_key: "sk-or-v1-YOUR_OPENROUTER_API_KEY" # <-- PASTE YOUR KEY HERE
+    model: "openai/gpt-4o-mini"
+    cost: # Per 1 Million tokens
+      input: 0.15
+      output: 0.60
+
+  # Example for another model. You can add models from other providers too.
+  # Just ensure the base_url and api_key are correct for that provider.
+  gemini-flash:
+    base_url: https://openrouter.ai/api/v1
+    api_key: "sk-or-v1-YOUR_OPENROUTER_API_KEY" # <-- PASTE YOUR KEY HERE
+    model: "google/gemini-flash-1.5"
+    cost:
+      input: 0.35
+      output: 0.70
+
+# --- Agent Configurations ---
+# Assign specific LLMs to perform different steps within each agent.
+# The keys here (e.g., '1_input_formatting') correspond to steps in the agent's code.
+# The values (e.g., 'gpt-4o-mini') must match one of the friendly names you
+# defined in the 'llms' section above.
+agents:
+  paper_search_agent:
+    # Step 1: Formats the raw text from the input file into a structured list.
+    # Recommended: A fast and cheap model.
+    1_input_formatting: gpt-4o-mini
+
+    # Step 2: Judges the best paper match from search results.
+    # Recommended: A fast and cheap model.
+    2_recall_papers: gpt-4o-mini
+
+    # Step 3: Reads a full paper and generates a detailed summary.
+    # Recommended: A powerful and accurate model.
+    3_2_paper_summary: gemini-flash

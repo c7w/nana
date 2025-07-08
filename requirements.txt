@@ -1,0 +1,7 @@
+requests
+PyYAML
+arxiv
+ddgs
+colorlog
+gradio
+pandas
