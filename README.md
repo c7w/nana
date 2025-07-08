@@ -1,5 +1,9 @@
 # Nana 项目：论文研究助手
 
+![paper_selection](assets/paper_selection.png)
+
+![paper_reading](assets/paper_reading.png)
+
 本工具是 Nana 项目的其中一个核心功能，一个旨在简化和自动化科研流程的智能助手。
 
 它能够接收一个论文标题列表，自动在线查找论文的详细信息（如 arXiv ID 和 PDF 链接），然后利用大语言模型（LLM）来生成结构清晰、内容详尽的专业摘要。所有结果都将通过一个简洁的 Web 界面进行展示，方便您随时查阅。
