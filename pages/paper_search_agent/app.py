@@ -26,6 +26,29 @@ CUSTOM_CSS = """
 .refresh-button {
     margin-bottom: 1rem;
 }
+
+/* Simple resizer styles */
+#main-row {
+    position: relative;
+}
+
+#main-row::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 60%;
+    width: 4px;
+    background: #e0e0e0;
+    cursor: col-resize;
+    z-index: 1000;
+    transform: translateX(-2px);
+    transition: background 0.2s;
+}
+
+#main-row:hover::after {
+    background: #007bff;
+}
 """
 
 def format_collection_time(collected_at_str):
@@ -139,7 +162,7 @@ def refresh_data():
 
 # --- Gradio App ---
 with gr.Blocks(theme=gr.themes.Soft(), title="Paper Research Interface", css=CUSTOM_CSS) as demo:
-    # Inject MathJax for LaTeX rendering
+    # Inject MathJax for LaTeX rendering and simple resizer
     gr.HTML("""
     <script>
     window.MathJax = {
@@ -148,6 +171,74 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Paper Research Interface", css=CUS
     };
     </script>
     <script src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js'></script>
+    
+    <script>
+    function initSimpleResizer() {
+        const mainRow = document.getElementById('main-row');
+        const leftColumn = document.getElementById('left-column');
+        const rightColumn = document.getElementById('right-column');
+        
+        if (!mainRow || !leftColumn || !rightColumn) {
+            setTimeout(initSimpleResizer, 500);
+            return;
+        }
+        
+        let isResizing = false;
+        let startX, startLeftWidth;
+        
+        // Add event listener to the pseudo-element area
+        mainRow.addEventListener('mousedown', (e) => {
+            const rect = mainRow.getBoundingClientRect();
+            const resizerX = rect.left + (rect.width * 0.6);
+            
+            // Check if click is near the resizer (within 10px)
+            if (Math.abs(e.clientX - resizerX) <= 10) {
+                isResizing = true;
+                startX = e.clientX;
+                startLeftWidth = 60; // Current left width percentage
+                
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+                e.preventDefault();
+            }
+        });
+        
+        function handleMouseMove(e) {
+            if (!isResizing) return;
+            
+            const mainRect = mainRow.getBoundingClientRect();
+            const deltaX = e.clientX - startX;
+            const deltaPercent = (deltaX / mainRect.width) * 100;
+            let newLeftWidth = startLeftWidth + deltaPercent;
+            
+            // Constrain between 20% and 80%
+            newLeftWidth = Math.max(20, Math.min(80, newLeftWidth));
+            const newRightWidth = 100 - newLeftWidth;
+            
+            // Update the CSS custom property for the resizer position
+            mainRow.style.setProperty('--resizer-pos', newLeftWidth + '%');
+            
+            // Update column flexbox properties
+            leftColumn.style.flex = newLeftWidth;
+            rightColumn.style.flex = newRightWidth;
+            
+            // Update the CSS ::after position
+            const style = document.createElement('style');
+            style.textContent = `#main-row::after { left: ${newLeftWidth}% !important; }`;
+            document.head.appendChild(style);
+        }
+        
+        function handleMouseUp() {
+            isResizing = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        }
+    }
+    
+    // Initialize after DOM loads
+    document.addEventListener('DOMContentLoaded', initSimpleResizer);
+    setTimeout(initSimpleResizer, 1000);
+    </script>
     """)
 
     # Store data in the app state for performance
@@ -174,14 +265,15 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Paper Research Interface", css=CUS
         info="Type to search for a paper by its ID, title, or collection date. Papers are sorted by collection time (newest first)."
     )
 
-    # Side-by-side layout for the PDF and summary
-    with gr.Row():
-        with gr.Column(scale=0.4):
-            gr.Markdown("### PDF Viewer")
-            pdf_viewer = gr.HTML("### Select a paper from the search bar above.")
-        with gr.Column(scale=0.6):
-            gr.Markdown("### AI Summary")
-            summary_viewer = gr.Markdown("### Select a paper from the search bar above.", elem_id="summary-viewer")
+    # Two-column layout with resizer
+    with gr.Row(elem_id="main-row"):
+        with gr.Column(scale=60, elem_id="left-column"):
+            gr.Markdown("### 📄 PDF Viewer")
+            pdf_viewer = gr.HTML(value="### Select a paper from the search bar above.", elem_id="pdf-viewer")
+        
+        with gr.Column(scale=40, elem_id="right-column"):
+            gr.Markdown("### 🤖 AI Summary")
+            summary_viewer = gr.Markdown(value="### Select a paper first to see its summary.", elem_id="summary-viewer")
 
     # Event handler for when a paper is selected from the dropdown
     search_dropdown.change(

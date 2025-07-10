@@ -31,6 +31,15 @@ llms:
       input: 0.35
       output: 0.70
 
+  # Gemini 2.5 Flash for chat functionality - faster and more conversational
+  gemini-2.5-flash:
+    base_url: https://openrouter.ai/api/v1
+    api_key: "sk-or-v1-YOUR_OPENROUTER_API_KEY" # <-- PASTE YOUR KEY HERE
+    model: "google/gemini-2.0-flash-exp"
+    cost:
+      input: 0.35
+      output: 0.70
+
 # --- Agent Configurations ---
 # Assign specific LLMs to perform different steps within each agent.
 # The keys here (e.g., '1_input_formatting') correspond to steps in the agent's code.

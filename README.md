@@ -1,8 +1,6 @@
 # Nana 项目：论文研究助手
 
-![paper_selection](assets/paper_selection.png)
-
-![paper_reading](assets/paper_reading.png)
+![paper](assets/rev1.png)
 
 本工具是 Nana 项目的其中一个核心功能，一个旨在简化和自动化科研流程的智能助手。
 

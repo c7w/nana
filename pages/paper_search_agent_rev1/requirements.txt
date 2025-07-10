@@ -1,0 +1,25 @@
+# FastAPI and web server dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+jinja2==3.1.2
+python-multipart==0.0.6
+
+# Data processing and validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP client and utilities
+requests==2.31.0
+aiofiles==23.2.1
+
+# Configuration and logging
+PyYAML==6.0.1
+
+# PDF processing (optional, for advanced PDF handling)
+PyPDF2==3.0.1
+
+pandas
+
+# Development dependencies (optional)
+# pytest==7.4.3
+# pytest-asyncio==0.21.1 
