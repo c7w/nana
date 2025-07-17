@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paper Search Agent Rev1</title>
+    <title>Paper Search Service</title>
     <link rel="stylesheet" href="/static/css/style.css">
     
     <!-- MathJax for LaTeX rendering -->
@@ -22,88 +22,140 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <h1>📚 Paper Research Interface Rev1</h1>
-            <p>Search for papers collected by the agent. Only papers with AI-generated summaries are shown.</p>
-        </header>
-
-        <!-- Controls - Block 1: 论文选择 -->
-        <div class="controls">
-            <div class="search-section">
-                <input type="text" id="searchInput" placeholder="Type to search for papers by ID, title, or date..." />
-                <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
-            </div>
-            <div class="paper-list-container">
-                <select id="paperSelect" size="5">
-                    <option value="">Loading papers...</option>
-                </select>
-                <div class="paper-count">
-                    <span id="paperCount">Loading...</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Block 2: PDF和AI摘要 (90vh 90vw) -->
-        <div class="main-content">
-            <div class="content-panels" id="contentPanels">
-                <!-- PDF Panel -->
-                <div class="panel pdf-panel" id="pdfPanel">
-                    <div class="panel-header">
-                        <h3>📄 PDF Viewer</h3>
-                    </div>
-                    <div class="panel-content">
-                        <div id="pdfViewer" class="pdf-viewer">
-                            <div class="empty-state">
-                                Select a paper to view its PDF
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Resizer -->
-                <div class="resizer" id="resizer"></div>
-
-                <!-- Summary Panel -->
-                <div class="panel summary-panel" id="summaryPanel">
-                    <div class="panel-header">
-                        <h3>🤖 AI Summary</h3>
-                    </div>
-                    <div class="panel-content">
-                        <div id="summaryViewer" class="summary-viewer">
-                            <div class="empty-state">
-                                Select a paper to view its AI summary
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Block 3: 聊天功能 -->
-        <div class="chat-section" id="chatSection">
-            <div class="chat-header">
-                <h3>💬 Chat with PDF</h3>
-            </div>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="#" class="navbar-brand">                📚 Paper Search Service
+            </a>
             
-            <div class="chat-content">
-                <!-- Chat Messages -->
-                <div id="chatMessages" class="chat-messages">
-                    <div class="welcome-message">
-                        <p>🤖 Select a paper to start chatting!</p>
-                        <div class="suggested-questions" id="suggestedQuestions">
-                            <!-- Will be populated by JavaScript -->
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a href="#reading" class="nav-link active" data-page="reading">📖 Reading</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#console" class="nav-link" data-page="console">⚙️ Console</a>
+                </li>
+            </ul>
+            
+            <div class="navbar-actions">
+                <button class="theme-toggle" id="themeToggle">
+                    <span class="icon">🌙</span>
+                    <span class="text">Dark</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Reading Page -->
+    <div id="readingPage" class="page-content active">
+        <div class="container">
+            <!-- Header -->
+            <header class="header">
+                <h1>📚 Paper Research Interface</h1>
+                <p>Search for papers collected by the agent. Only papers with AI-generated summaries are shown.</p>
+            </header>
+
+            <!-- Controls - Block 1: 论文选择 -->
+            <div class="controls">
+                <div class="search-section">
+                    <input type="text" id="searchInput" placeholder="Type to search for papers by ID, title, or date..." />
+                    <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
+                </div>
+                <div class="paper-list-container">
+                    <select id="paperSelect" size="5">
+                        <option value="">Loading papers...</option>
+                    </select>
+                    <div class="paper-count">
+                        <span id="paperCount">Loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Block 2: PDF和AI摘要 (90vh 90vw) -->
+            <div class="main-content">
+                <div class="content-panels" id="contentPanels">
+                    <!-- PDF Panel -->
+                    <div class="panel pdf-panel" id="pdfPanel">
+                        <div class="panel-header">
+                            <h3>📄 PDF Viewer</h3>
+                        </div>
+                        <div class="panel-content">
+                            <div id="pdfViewer" class="pdf-viewer">
+                                <div class="empty-state">
+                                    Select a paper to view its PDF
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Resizer -->
+                    <div class="resizer" id="resizer"></div>
+
+                    <!-- Summary Panel -->
+                    <div class="panel summary-panel" id="summaryPanel">
+                        <div class="panel-header">
+                            <h3>🤖 AI Summary</h3>
+                        </div>
+                        <div class="panel-content">
+                            <div id="summaryViewer" class="summary-viewer">
+                                <div class="empty-state">
+                                    Select a paper to view its AI summary
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Block 3: 聊天功能 -->
+            <div class="chat-section" id="chatSection">
+                <div class="chat-header">
+                    <h3>💬 Chat with PDF</h3>
                 </div>
                 
-                <!-- Chat Input -->
-                <div class="chat-input-area">
-                    <div class="chat-input-container">
-                        <input type="text" id="chatInput" placeholder="Ask a question about this paper..." disabled />
-                        <button id="sendChatBtn" class="btn btn-primary" disabled>Send</button>
+                <div class="chat-content">
+                    <!-- Chat Messages -->
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="welcome-message">
+                            <p>🤖 Select a paper to start chatting!</p>
+                            <div class="suggested-questions" id="suggestedQuestions">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
+                        </div>
                     </div>
+                    
+                    <!-- Chat Input -->
+                    <div class="chat-input-area">
+                        <div class="chat-input-container">
+                            <input type="text" id="chatInput" placeholder="Ask a question about this paper..." disabled />
+                            <button id="sendChatBtn" class="btn btn-primary" disabled>Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Console Page -->
+    <div id="consolePage" class="page-content">
+        <div class="console-page">
+            <div class="console-header">
+                <h1>System Management</h1>
+                <p>System management and configuration interface</p>
+            </div>
+            
+            <div class="console-content">
+                <div class="console-placeholder">
+                    <div class="icon">🔧</div>
+                    <h3>Console Interface</h3>
+                    <p>This page is under development. Future features will include:</p>
+                    <ul style="text-align: left; margin-top: 20px;">
+                        <li>System status monitoring</li>
+                        <li>Configuration management</li>
+                        <li>Task queue management</li>
+                        <li>Performance metrics</li>
+                        <li>Log viewing and analysis</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -120,5 +172,6 @@
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/resizer.js"></script>
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/navigation.js"></script>
 </body>
 </html> 

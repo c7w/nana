@@ -9,11 +9,20 @@ class PaperSearchApp {
         this.papers = [];
         this.currentPaper = null;
         this.isLoading = false;
+        this.initialized = false;
         
+        // Only initialize if were on the reading page
+        if (document.getElementById('readingPage')) {
+            this.init();
+        }
+    }
+
+    init() {
         try {
             this.initializeElements();
             this.bindEvents();
             this.loadPapers();
+            this.initialized = true;
             console.log('PaperSearchApp initialized successfully');
         } catch (error) {
             console.error('Error initializing PaperSearchApp:', error);
