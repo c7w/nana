@@ -1,0 +1,683 @@
+/* 全局样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 90vw;
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* 头部样式 */
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.header h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.header p {
+    color: #666;
+    font-size: 16px;
+}
+
+/* Block 1: 控制区域 - 论文选择 */
+.controls {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.search-section {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+#searchInput {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.paper-list-container {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+#paperSelect {
+    flex: 1;
+    min-height: 120px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px;
+    font-size: 14px;
+}
+
+#paperSelect option {
+    padding: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.paper-count {
+    color: #666;
+    font-size: 14px;
+    min-width: 150px;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-small {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+/* Block 2: 主内容区域 - PDF和AI摘要 (90vh 90vw) */
+.main-content {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.content-panels {
+    display: flex;
+    width: 90vw;
+    height: 90vh;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+}
+
+.pdf-panel {
+    flex: 0 0 60%;
+}
+
+.summary-panel {
+    flex: 0 0 40%;
+}
+
+.panel-header {
+    background: #f8f9fa;
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #495057;
+}
+
+.panel-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* PDF查看器 */
+.pdf-viewer {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.pdf-viewer iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* 摘要查看器 */
+.summary-viewer {
+    height: 100%;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.summary-viewer h1, .summary-viewer h2, .summary-viewer h3, 
+.summary-viewer h4, .summary-viewer h5, .summary-viewer h6 {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+}
+
+.summary-viewer h1 { font-size: 1.2em; }
+.summary-viewer h2 { font-size: 1.1em; }
+.summary-viewer h3 { font-size: 1em; }
+
+.summary-viewer p {
+    margin-bottom: 1em;
+}
+
+.summary-viewer ul, .summary-viewer ol {
+    margin-left: 20px;
+    margin-bottom: 1em;
+}
+
+.summary-viewer code {
+    background: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+}
+
+.summary-viewer pre {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin-bottom: 1em;
+}
+
+/* 拖拽分割线 */
+.resizer {
+    width: 4px;
+    background: linear-gradient(to right, #e0e0e0, #f0f0f0, #e0e0e0);
+    cursor: col-resize;
+    position: relative;
+    transition: background 0.2s;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.resizer:hover {
+    background: linear-gradient(to right, #007bff, #0056b3, #007bff);
+}
+
+.resizer.dragging {
+    background: linear-gradient(to right, #007bff, #0056b3, #007bff);
+}
+
+.resizer::before {
+    content: '⋮⋮';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(90deg);
+    color: #666;
+    font-size: 12px;
+    letter-spacing: -2px;
+    pointer-events: none;
+}
+
+.resizer:hover::before {
+    color: white;
+}
+
+/* 空状态 */
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+    font-size: 16px;
+    text-align: center;
+    flex-direction: column;
+}
+
+.empty-state h3 {
+    margin: 10px 0;
+    color: #333;
+}
+
+/* Block 3: 聊天区域 */
+.chat-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
+    max-height: 80vh;
+    transition: height 0.3s ease-in-out;
+}
+
+.chat-header {
+    background: #f8f9fa;
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px 8px 0 0;
+}
+
+.chat-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #495057;
+}
+
+.chat-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    min-height: 200px;
+    max-height: calc(80vh - 120px);
+}
+
+.welcome-message {
+    text-align: center;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.suggested-questions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.suggestion-btn {
+    background: #e9ecef;
+    border: 1px solid #dee2e6;
+    padding: 8px 12px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.suggestion-btn:hover {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.chat-message {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+}
+
+.chat-message.user {
+    flex-direction: row-reverse;
+}
+
+.chat-message-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.chat-message.user .chat-message-avatar {
+    background: #007bff;
+    color: white;
+}
+
+.chat-message.assistant .chat-message-avatar {
+    background: #28a745;
+    color: white;
+}
+
+.chat-message-content {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    line-height: 1.4;
+}
+
+.chat-message.user .chat-message-content {
+    background: #007bff;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message.assistant .chat-message-content {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-bottom-left-radius: 4px;
+}
+
+/* 聊天消息中的Markdown样式 */
+.chat-message-content h1, 
+.chat-message-content h2, 
+.chat-message-content h3, 
+.chat-message-content h4, 
+.chat-message-content h5, 
+.chat-message-content h6 {
+    margin-top: 0.8em;
+    margin-bottom: 0.4em;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.chat-message-content h1 { 
+    font-size: 1.1em; 
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.3em;
+}
+
+.chat-message-content h2 { 
+    font-size: 1.05em; 
+    color: #34495e;
+    border-bottom: 1px solid #bdc3c7;
+    padding-bottom: 0.2em;
+}
+
+.chat-message-content h3 { 
+    font-size: 1em; 
+    color: #34495e;
+    font-weight: 600;
+}
+
+.chat-message-content h4 { 
+    font-size: 0.95em; 
+    color: #7f8c8d;
+    font-weight: 600;
+}
+
+.chat-message-content p {
+    margin-bottom: 0.8em;
+    line-height: 1.5;
+}
+
+.chat-message-content ul, 
+.chat-message-content ol {
+    margin: 0.5em 0 0.8em 1.2em;
+    padding-left: 0.5em;
+}
+
+.chat-message-content li {
+    margin-bottom: 0.3em;
+    line-height: 1.4;
+}
+
+.chat-message-content ul li {
+    list-style-type: disc;
+}
+
+.chat-message-content ol li {
+    list-style-type: decimal;
+}
+
+.chat-message-content strong {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.chat-message-content em {
+    font-style: italic;
+    color: #7f8c8d;
+}
+
+.chat-message-content code {
+    background: #ecf0f1;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+    color: #e74c3c;
+}
+
+.chat-message-content pre {
+    background: #2c3e50;
+    color: #ecf0f1;
+    padding: 1em;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 0.8em 0;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.chat-message-content pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+}
+
+.chat-message-content blockquote {
+    border-left: 4px solid #3498db;
+    margin: 0.8em 0;
+    padding: 0.5em 0 0.5em 1em;
+    background: #ecf0f1;
+    font-style: italic;
+    color: #7f8c8d;
+}
+
+.chat-message-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.8em 0;
+    font-size: 0.9em;
+}
+
+.chat-message-content th,
+.chat-message-content td {
+    border: 1px solid #bdc3c7;
+    padding: 0.5em;
+    text-align: left;
+}
+
+.chat-message-content th {
+    background: #ecf0f1;
+    font-weight: 600;
+}
+
+.chat-message-content hr {
+    border: none;
+    border-top: 2px solid #bdc3c7;
+    margin: 1em 0;
+}
+
+.chat-input-area {
+    padding: 15px;
+}
+
+.chat-input-container {
+    display: flex;
+    gap: 10px;
+}
+
+#chatInput {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-size: 14px;
+}
+
+/* 加载动画 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    color: #666;
+    font-size: 16px;
+}
+
+/* 打字指示器动画 */
+.typing-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.typing-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #666;
+    animation: typing 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.3;
+    }
+    30% {
+        transform: translateY(-10px);
+        opacity: 1;
+    }
+}
+
+/* 聊天消息动画 */
+.chat-message.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .content-panels {
+        width: 95vw;
+        height: 70vh;
+        flex-direction: column;
+    }
+
+    .pdf-panel, .summary-panel {
+        flex: none;
+        height: 300px;
+    }
+
+    .resizer {
+        width: 100%;
+        height: 4px;
+        cursor: row-resize;
+    }
+
+    .paper-list-container {
+        flex-direction: column;
+    }
+
+    .search-section {
+        flex-direction: column;
+    }
+    
+    /* 移动设备上的聊天消息样式调整 */
+    .chat-message-content {
+        max-width: 85%;
+        font-size: 14px;
+    }
+    
+    .chat-message-content h1 { font-size: 1.05em; }
+    .chat-message-content h2 { font-size: 1em; }
+    .chat-message-content h3 { font-size: 0.95em; }
+    
+    .chat-message-content ul, 
+    .chat-message-content ol {
+        margin-left: 1em;
+        padding-left: 0.3em;
+    }
+    
+    .chat-message-content pre {
+        font-size: 0.8em;
+        padding: 0.8em;
+    }
+} 
