@@ -140,22 +140,57 @@
     <div id="consolePage" class="page-content">
         <div class="console-page">
             <div class="console-header">
-                <h1>System Management</h1>
-                <p>System management and configuration interface</p>
+                <div class="header-content">
+                    <h1>📊 System Console</h1>
+                    <p>Monitor and manage paper processing tasks</p>
+                </div>
+                <div class="header-actions">
+                    <button id="refreshTasks" class="btn btn-secondary">
+                        <span class="icon">🔄</span>
+                        Refresh
+                    </button>
+                    <span id="autoRefreshStatus" class="status-text">Auto-refresh: ON</span>
+                </div>
             </div>
             
             <div class="console-content">
-                <div class="console-placeholder">
-                    <div class="icon">🔧</div>
-                    <h3>Console Interface</h3>
-                    <p>This page is under development. Future features will include:</p>
-                    <ul style="text-align: left; margin-top: 20px;">
-                        <li>System status monitoring</li>
-                        <li>Configuration management</li>
-                        <li>Task queue management</li>
-                        <li>Performance metrics</li>
-                        <li>Log viewing and analysis</li>
-                    </ul>
+                <!-- Task Creation Section -->
+                <div class="console-section">
+                    <h3>📝 Create New Task</h3>
+                    <div class="task-form">
+                        <div class="form-group">
+                            <label for="taskTitle">Task Title:</label>
+                            <input type="text" id="taskTitle" placeholder="Enter task title..." class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="paperList">Paper List:</label>
+                            <textarea id="paperList" placeholder="Enter paper titles, URLs, or citations... Each paper on a new line." class="form-textarea" rows="6"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="taskDescription">Description (optional):</label>
+                            <input type="text" id="taskDescription" placeholder="Brief description of this task..." class="form-input">
+                        </div>
+                        <button id="createTask" class="btn btn-primary">
+                            <span class="icon">🚀</span>
+                            Create Task
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Task Queue Section -->
+                <div class="console-section">
+                    <h3>⚡ Active Tasks</h3>
+                    <div id="taskQueue" class="task-queue">
+                        <div class="loading-state">Loading tasks...</div>
+                    </div>
+                </div>
+
+                <!-- Task History Section -->
+                <div class="console-section">
+                    <h3>📋 All Tasks</h3>
+                    <div id="taskHistory" class="task-history">
+                        <div class="loading-state">Loading task history...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -173,5 +208,6 @@
     <script src="/static/js/resizer.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/navigation.js"></script>
+    <script src="/static/js/console.js"></script>
 </body>
 </html> 

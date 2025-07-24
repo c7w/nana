@@ -93,7 +93,10 @@ class NavigationManager {
     }
 
     initializeConsolePage() {
-        // Future console page initialization
+        // Initialize console manager if not already done
+        if (!window.consoleManager && window.ConsoleManager) {
+            window.consoleManager = new ConsoleManager();
+        }
         console.log('Console page initialized');
     }
 

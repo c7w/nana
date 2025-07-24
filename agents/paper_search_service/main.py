@@ -16,6 +16,7 @@ sys.path.append(str(project_root))
 
 from api.papers import router as papers_router
 from api.chat import router as chat_router
+from api.tasks import router as tasks_router
 
 app = FastAPI(title="Paper Search Agent Rev1", version="1.0.0")
 
@@ -28,6 +29,7 @@ templates = Jinja2Templates(directory="templates")
 # 包含API路由
 app.include_router(papers_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(tasks_router, prefix="/api")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
