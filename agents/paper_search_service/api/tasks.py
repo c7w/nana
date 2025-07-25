@@ -97,8 +97,14 @@ async def start_processing(task_id: str, background_tasks: BackgroundTasks):
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
+        # Enhanced status check - be more specific about what states are acceptable
         if task.status != "pending":
-            raise HTTPException(status_code=400, detail="Task is not in pending status")
+            if task.status in ["formatting_input", "searching_papers", "analyzing_papers"]:
+                raise HTTPException(status_code=409, detail=f"Task is already being processed (status: {task.status})")
+            elif task.status in ["completed", "failed"]:
+                raise HTTPException(status_code=410, detail=f"Task has already finished (status: {task.status})")
+            else:
+                raise HTTPException(status_code=400, detail=f"Task is not in pending status (current: {task.status})")
         
         # Start processing in background
         background_tasks.add_task(task_processor.process_task_sync, task_id)

@@ -6,7 +6,7 @@
 class ConsoleManager {
     constructor() {
         this.autoRefreshInterval = null;
-        this.autoRefreshEnabled = true;
+        this.autoRefreshEnabled = false; // 关闭自动刷新
         this.refreshIntervalMs = 10000; // 10 seconds
         this.currentTasks = new Map();
         this.init();
@@ -38,6 +38,12 @@ class ConsoleManager {
     }
 
     async createTask() {
+        // Prevent multiple submissions
+        const createButton = document.getElementById('createTask');
+        if (createButton.disabled) {
+            return;
+        }
+        
         const title = document.getElementById('taskTitle')?.value.trim();
         const paperList = document.getElementById('paperList')?.value.trim();
         const description = document.getElementById('taskDescription')?.value.trim();
@@ -46,6 +52,10 @@ class ConsoleManager {
             this.showMessage('Please provide both task title and paper list.', 'error');
             return;
         }
+
+        // Disable button to prevent double submission
+        createButton.disabled = true;
+        createButton.innerHTML = '<span class="icon">⏳</span> Creating...';
 
         try {
             const response = await fetch('/api/tasks/', {
@@ -81,6 +91,10 @@ class ConsoleManager {
         } catch (error) {
             console.error('Error creating task:', error);
             this.showMessage(`Failed to create task: ${error.message}`, 'error');
+        } finally {
+            // Re-enable button
+            createButton.disabled = false;
+            createButton.innerHTML = '<span class="icon">🚀</span> Create Task';
         }
     }
 
@@ -115,88 +129,104 @@ class ConsoleManager {
 
         } catch (error) {
             console.error('Error loading tasks:', error);
-            this.showTaskError('Failed to load tasks');
+            this.showMessage('Failed to load tasks', 'error');
         }
     }
 
     updateTaskDisplay(tasks) {
-        const activeTasks = tasks.filter(task => 
-            ['pending', 'formatting_input', 'searching_papers', 'analyzing_papers'].includes(task.status)
-        );
-        const completedTasks = tasks.filter(task => 
-            ['completed', 'failed'].includes(task.status)
-        );
-
-        this.renderTaskQueue(activeTasks);
-        this.renderTaskHistory(completedTasks);
+        this.renderAllTasks(tasks);
     }
 
-    renderTaskQueue(activeTasks) {
-        const queueContainer = document.getElementById('taskQueue');
+    renderAllTasks(tasks) {
+        const allTasksContainer = document.getElementById('allTasks');
         
-        if (activeTasks.length === 0) {
-            queueContainer.innerHTML = '<div class="empty-state">No active tasks</div>';
+        if (!allTasksContainer) {
+            console.error('All tasks container not found');
+            return;
+        }
+        
+        if (tasks.length === 0) {
+            allTasksContainer.innerHTML = '<div class="empty-state">No tasks found</div>';
             return;
         }
 
-        const tasksHtml = activeTasks.map(task => this.renderTaskCard(task, true)).join('');
-        queueContainer.innerHTML = tasksHtml;
-    }
-
-    renderTaskHistory(completedTasks) {
-        const historyContainer = document.getElementById('taskHistory');
+        // Sort tasks by creation time (newest first)
+        const sortedTasks = tasks.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         
-        if (completedTasks.length === 0) {
-            historyContainer.innerHTML = '<div class="empty-state">No completed tasks</div>';
-            return;
-        }
-
-        // Show only latest 10 tasks
-        const recentTasks = completedTasks
-            .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-            .slice(0, 10);
-
-        const tasksHtml = recentTasks.map(task => this.renderTaskCard(task, false)).join('');
-        historyContainer.innerHTML = tasksHtml;
+        const tasksHtml = sortedTasks.map(task => this.renderTaskItem(task)).join('');
+        allTasksContainer.innerHTML = tasksHtml;
     }
 
-    renderTaskCard(task, isActive) {
-        const statusIcon = this.getStatusIcon(task.status);
+    renderTaskItem(task) {
         const statusText = this.getStatusText(task.status);
-        const progressBar = isActive ? this.renderProgressBar(task.progress) : '';
-        const timestamp = new Date(task.updated_at).toLocaleString();
-
+        const isActive = ['pending', 'formatting_input', 'searching_papers', 'analyzing_papers'].includes(task.status);
+        const createdTime = new Date(task.created_at).toLocaleString();
+        const updatedTime = new Date(task.updated_at).toLocaleString();
+        
+        // Calculate progress info
+        const progressInfo = this.getTaskProgressInfo(task);
+        
         return `
-            <div class="task-card ${task.status}" data-task-id="${task.id}">
-                <div class="task-header">
-                    <div class="task-title">
-                        <span class="status-icon">${statusIcon}</span>
-                        <h4>${this.escapeHtml(task.title)}</h4>
-                    </div>
-                    <div class="task-status">
-                        <span class="status-text">${statusText}</span>
-                        <span class="timestamp">${timestamp}</span>
-                    </div>
+            <div class="task-item" data-task-id="${task.id}">
+                <div class="task-item-header">
+                    <h4 class="task-item-title">${this.escapeHtml(task.title)}</h4>
+                    <span class="task-item-status ${task.status}">${statusText}</span>
                 </div>
                 
-                ${progressBar}
+                <div class="task-item-progress">
+                    ${progressInfo}
+                </div>
+                
+                ${isActive && task.progress ? this.renderProgressBar(task.progress) : ''}
                 
                 ${task.error ? `<div class="task-error">❌ ${this.escapeHtml(task.error)}</div>` : ''}
                 
-                <div class="task-actions">
-                    <button class="btn btn-small" onclick="consoleManager.showTaskDetails('${task.id}')">
-                        📋 Details
-                    </button>
-                    <button class="btn btn-small" onclick="consoleManager.showTaskLogs('${task.id}')">
+                <div class="task-item-actions">
+                    <button class="task-item-btn" onclick="consoleManager.showTaskLogs('${task.id}')">
                         📜 Logs
                     </button>
+                    <button class="task-item-btn" onclick="consoleManager.showTaskDetails('${task.id}')">
+                        📋 Details
+                    </button>
                     ${task.status === 'completed' || task.status === 'failed' ? 
-                        `<button class="btn btn-small btn-danger" onclick="consoleManager.deleteTask('${task.id}')">🗑️ Delete</button>` : 
+                        `<button class="task-item-btn" onclick="consoleManager.deleteTask('${task.id}')">🗑️ Delete</button>` : 
                         ''
                     }
                 </div>
+                
+                <div class="task-item-time">
+                    Created: ${createdTime}
+                    ${task.completed_at ? ` | Completed: ${new Date(task.completed_at).toLocaleString()}` : ''}
+                </div>
             </div>
         `;
+    }
+
+    getTaskProgressInfo(task) {
+        if (!task.papers || task.papers.length === 0) {
+            return `<span>No papers to process</span>`;
+        }
+
+        const total = task.papers.length;
+        const completed = task.papers.filter(p => p.status === 'completed').length;
+        const searchCompleted = task.papers.filter(p => p.status === 'search_completed').length;
+        const searching = task.papers.filter(p => p.status === 'searching').length;
+        const analyzing = task.papers.filter(p => p.status === 'analyzing').length;
+        const failed = task.papers.filter(p => p.status === 'failed').length;
+
+        if (task.status === 'completed') {
+            return `<span>📊 Completed ${completed} papers (${failed > 0 ? `${failed} failed` : 'all successful'})</span>`;
+        } else {
+            const statusParts = [];
+            if (searching > 0) statusParts.push(`${searching} searching`);
+            if (searchCompleted > 0) statusParts.push(`${searchCompleted} ready for analysis`);
+            if (analyzing > 0) statusParts.push(`${analyzing} analyzing`);
+            if (completed > 0) statusParts.push(`${completed} completed`);
+            if (failed > 0) statusParts.push(`${failed} failed`);
+            
+            const statusText = statusParts.length > 0 ? statusParts.join(', ') : 'preparing';
+            return `<span>📊 Papers (${total} total): ${statusText}</span>`;
+        }
     }
 
     renderProgressBar(progress) {
@@ -223,8 +253,9 @@ class ConsoleManager {
             'pending': '⏳',
             'formatting_input': '📝',
             'searching_papers': '🔍',
+            'search_completed': '✅',
             'analyzing_papers': '🧠',
-            'completed': '✅',
+            'completed': '🎉',
             'failed': '❌'
         };
         return icons[status] || '❓';
@@ -235,6 +266,7 @@ class ConsoleManager {
             'pending': 'Pending',
             'formatting_input': 'Formatting Input',
             'searching_papers': 'Searching Papers',
+            'search_completed': 'Search Completed',
             'analyzing_papers': 'Analyzing Papers',
             'completed': 'Completed',
             'failed': 'Failed'
@@ -475,15 +507,7 @@ class ConsoleManager {
         }
     }
 
-    showTaskError(message) {
-        const queueContainer = document.getElementById('taskQueue');
-        const historyContainer = document.getElementById('taskHistory');
-        
-        const errorHtml = `<div class="error-state">❌ ${message}</div>`;
-        
-        if (queueContainer) queueContainer.innerHTML = errorHtml;
-        if (historyContainer) historyContainer.innerHTML = errorHtml;
-    }
+
 
     showMessage(message, type = 'info') {
         // Create and show a temporary message

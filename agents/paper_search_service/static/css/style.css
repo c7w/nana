@@ -822,10 +822,38 @@ body {
 /* Console Page Styles */
 .console-page {
     padding: 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .console-header {
     margin-bottom: 20px;
+    flex-shrink: 0;
+}
+
+/* Two-column Layout */
+.console-layout {
+    display: flex;
+    gap: 20px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.console-left-panel,
+.console-right-panel {
+    width: 50vw;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.console-left-panel {
+    max-width: calc(50vw - 10px);
+}
+
+.console-right-panel {
+    max-width: calc(50vw - 10px);
 }
 
 .console-header h1 {
@@ -833,13 +861,270 @@ body {
     margin-bottom: 10px;
 }
 
-.console-content {
+/* Section Styles */
+.console-section {
     background: var(--bg-primary);
     border-radius: 8px;
     padding: 20px;
     box-shadow: var(--shadow);
     border: 1px solid var(--border-color);
-    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.section-header {
+    margin-bottom: 15px;
+    flex-shrink: 0;
+}
+
+.section-header h3 {
+    margin: 0 0 5px 0;
+    color: var(--text-primary);
+    font-size: 1.2em;
+}
+
+.section-description {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    margin: 0;
+}
+
+/* Task Form Styles */
+.task-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9em;
+}
+
+.form-input,
+.form-textarea {
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.9em;
+    resize: vertical;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.form-textarea {
+    min-height: 100px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.4;
+}
+
+.form-hint {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 5px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.form-hint ul {
+    margin: 5px 0 0 0;
+    padding-left: 15px;
+}
+
+.form-hint li {
+    margin: 2px 0;
+}
+
+/* All Tasks Area */
+.all-tasks {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 5px;
+}
+
+.task-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 15px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.task-item:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
+.task-item-header {
+    display: flex;
+    justify-content: between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    gap: 10px;
+}
+
+.task-item-title {
+    flex: 1;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    font-size: 1em;
+}
+
+.task-item-status {
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: 500;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.task-item-progress {
+    margin: 8px 0;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.task-item-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.task-item-btn {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.75em;
+    transition: all 0.2s ease;
+}
+
+.task-item-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.task-item-time {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-top: 8px;
+}
+
+/* Task Status Colors */
+.task-item-status.pending {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+    border: 1px solid rgba(108, 117, 125, 0.2);
+}
+
+.task-item-status.formatting_input {
+    background: rgba(13, 202, 240, 0.1);
+    color: #0dcaf0;
+    border: 1px solid rgba(13, 202, 240, 0.2);
+}
+
+.task-item-status.searching_papers {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.task-item-status.search_completed {
+    background: rgba(32, 201, 151, 0.1);
+    color: #20c997;
+    border: 1px solid rgba(32, 201, 151, 0.2);
+}
+
+.task-item-status.analyzing_papers {
+    background: rgba(255, 193, 7, 0.1);
+    color: #fd7e14;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.task-item-status.completed {
+    background: rgba(25, 135, 84, 0.1);
+    color: #198754;
+    border: 1px solid rgba(25, 135, 84, 0.2);
+}
+
+.task-item-status.failed {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    border: 1px solid rgba(220, 53, 69, 0.2);
+}
+
+/* Progress Indicators */
+.task-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border-light);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 5px 0;
+}
+
+.task-progress-fill {
+    height: 100%;
+    background: var(--accent-color);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.paper-status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.paper-status-indicator.pending {
+    background: #6c757d;
+}
+
+.paper-status-indicator.searching {
+    background: #ffc107;
+}
+
+.paper-status-indicator.analyzing {
+    background: #fd7e14;
+}
+
+.paper-status-indicator.completed {
+    background: #198754;
+}
+
+.paper-status-indicator.failed {
+    background: #dc3545;
 }
 
 .console-placeholder {
@@ -1651,4 +1936,42 @@ body {
     .log-data-content.expanded {
         max-height: 300px;
     }
-} 
+}
+
+/* Console Page Responsive Design */
+@media (max-width: 768px) {
+    .console-layout {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .console-left-panel,
+    .console-right-panel {
+        width: 100%;
+        max-width: none;
+    }
+    
+    .task-form {
+        gap: 10px;
+    }
+    
+    .form-textarea {
+        rows: 8;
+    }
+    
+    .task-item-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .task-item-actions {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    
+    .task-item-btn {
+        font-size: 0.7em;
+        padding: 3px 6px;
+    }
+}

@@ -41,6 +41,14 @@ class TaskProcessor:
             logging.error(f"Task {task_id} not found")
             return False
         
+        # Critical: Check if task is already being processed (prevent concurrent processing)
+        if task.status != TaskStatus.PENDING:
+            logging.warning(f"Task {task_id} is not in pending status (current: {task.status}), skipping processing")
+            task.add_log("INIT", "WARNING", f"Attempted to process task that is not pending (status: {task.status})")
+            return False
+        
+        # Atomically update status to prevent concurrent processing
+        task.update_status(TaskStatus.FORMATTING_INPUT)
         task.add_log("INIT", "INFO", f"Starting task processing: {task.title}")
         self.task_storage.update_task(task)
         
@@ -49,8 +57,28 @@ class TaskProcessor:
             await self._search_papers(task)
             await self._analyze_papers(task)
             
-            task.add_log("COMPLETE", "INFO", "Task processing completed successfully")
-            task.update_status(TaskStatus.COMPLETED)
+            # Update reading page cache with completed papers
+            self._update_reading_cache(task)
+            
+            # Check if task should be marked as completed or failed
+            completed_papers = sum(1 for paper in task.papers if paper.status == PaperStatus.COMPLETED)
+            failed_papers = sum(1 for paper in task.papers if paper.status == PaperStatus.FAILED)
+            pending_papers = sum(1 for paper in task.papers if paper.status == PaperStatus.PENDING)
+            
+            if pending_papers > 0:
+                # Still have pending papers - this shouldn't happen in normal flow
+                task.add_log("COMPLETE", "WARNING", f"Task has {pending_papers} pending papers - marking as failed")
+                task.error = f"Task incomplete: {pending_papers} papers failed to process"
+                task.update_status(TaskStatus.FAILED)
+            elif completed_papers == 0:
+                # No papers completed - mark as failed
+                task.add_log("COMPLETE", "ERROR", "Task failed: no papers were successfully processed")
+                task.error = "All papers failed to process"
+                task.update_status(TaskStatus.FAILED)
+            else:
+                # At least some papers completed successfully
+                task.add_log("COMPLETE", "INFO", f"Task processing completed: {completed_papers} successful, {failed_papers} failed")
+                task.update_status(TaskStatus.COMPLETED)
             self.task_storage.update_task(task)
             return True
         except Exception as e:
@@ -77,7 +105,7 @@ class TaskProcessor:
             return False
 
     async def _format_input(self, task: ProcessingTask):
-        task.update_status(TaskStatus.FORMATTING_INPUT)
+        # Status already set in process_task to prevent race condition
         task.add_log("FORMAT_INPUT", "INFO", "Starting input formatting stage")
         self.task_storage.update_task(task)
         
@@ -120,7 +148,7 @@ class TaskProcessor:
                     task.add_log("FORMAT_INPUT", "INFO", f"Successfully formatted {len(task.papers)} papers", {
                         "papers_count": len(task.papers),
                         "formatted_data": formatted_data,
-                        "paper_titles": [paper['title'] for paper in papers[:5]]  # First 5 titles
+                        "paper_titles": [paper['title'] for paper in papers]  # First 5 titles
                     })
                     
                     logging.info(f"Formatted {len(task.papers)} papers")
@@ -165,7 +193,7 @@ class TaskProcessor:
         results = await asyncio.gather(*search_tasks, return_exceptions=True)
         
         # Log overall results
-        successful_searches = sum(1 for paper in task.papers if paper.status == PaperStatus.COMPLETED)
+        successful_searches = sum(1 for paper in task.papers if paper.status == PaperStatus.SEARCH_COMPLETED)
         failed_searches = sum(1 for paper in task.papers if paper.status == PaperStatus.FAILED)
         
         task.add_log("SEARCH_PAPERS", "INFO", f"Search stage completed: {successful_searches} successful, {failed_searches} failed", {
@@ -200,7 +228,7 @@ class TaskProcessor:
                         else:
                             serializable_details[k] = str(v)
                     paper.progress['search'] = serializable_details
-                    paper.status = PaperStatus.COMPLETED
+                    paper.status = PaperStatus.SEARCH_COMPLETED  # Search done, ready for analysis
                     
                     task.add_log("SEARCH_PAPERS", "INFO", f"Successfully found details for: {paper.title[:100]}...", {
                         "paper_index": index,
@@ -254,7 +282,7 @@ class TaskProcessor:
         # Filter papers that are ready for analysis
         papers_to_analyze = [
             (i, paper) for i, paper in enumerate(task.papers) 
-            if paper.status == PaperStatus.COMPLETED and 'search' in paper.progress
+            if paper.status == PaperStatus.SEARCH_COMPLETED and 'search' in paper.progress
         ]
         
         task.add_log("ANALYZE_PAPERS", "INFO", f"Found {len(papers_to_analyze)} papers ready for analysis out of {len(task.papers)} total", {
@@ -407,4 +435,85 @@ class TaskProcessor:
                 "error": task.error
             }
             for task in tasks
-        ] 
+        ]
+
+    def _update_reading_cache(self, task: ProcessingTask):
+        """Update the reading page cache with successfully analyzed papers"""
+        import json
+        
+        # Path to the reading page cache
+        cache_path = project_root / 'storage' / 'paper_search_agent' / 'cache.json'
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Load existing cache
+        cache = {}
+        if cache_path.exists():
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    cache = json.load(f)
+            except Exception as e:
+                logging.warning(f"Failed to load existing cache: {e}")
+                cache = {}
+        
+        # Add successfully analyzed papers to cache
+        updated_count = 0
+        skipped_count = 0
+        for paper in task.papers:
+            if paper.status == PaperStatus.COMPLETED and 'search' in paper.progress and 'analysis' in paper.progress:
+                # Normalize title for cache key (use same logic as original paper_search_agent)
+                cache_key = _normalize_title(paper.title)
+                
+                # Check if paper already exists in cache with summary
+                if cache_key in cache and 'summary_path' in cache[cache_key]:
+                    task.add_log("CACHE_UPDATE", "INFO", f"Paper already exists in cache with summary: {paper.title[:100]}...", {
+                        "paper_title": paper.title,
+                        "cache_key": cache_key,
+                        "existing_summary_path": cache[cache_key]['summary_path']
+                    })
+                    skipped_count += 1
+                    continue
+                
+                # Create cache entry
+                cache_entry = {
+                    "title": paper.title,
+                    "url": paper.url,
+                    "collected_at": task.created_at.isoformat(),
+                    **paper.progress['search'],  # Include search metadata
+                    "summary_path": paper.progress['analysis']['summary_path']
+                }
+                
+                cache[cache_key] = cache_entry
+                updated_count += 1
+                
+                task.add_log("CACHE_UPDATE", "INFO", f"Added paper to reading cache: {paper.title[:100]}...", {
+                    "paper_title": paper.title,
+                    "cache_key": cache_key,
+                    "summary_path": paper.progress['analysis']['summary_path']
+                })
+        
+        if updated_count > 0:
+            # Save updated cache
+            try:
+                with open(cache_path, 'w', encoding='utf-8') as f:
+                    json.dump(cache, f, indent=2, ensure_ascii=False)
+                
+                task.add_log("CACHE_UPDATE", "INFO", f"Successfully updated reading cache with {updated_count} papers ({skipped_count} skipped as duplicates)", {
+                    "cache_path": str(cache_path),
+                    "papers_added": updated_count,
+                    "papers_skipped": skipped_count,
+                    "total_cache_entries": len(cache)
+                })
+                logging.info(f"Updated reading cache with {updated_count} papers from task {task.id} ({skipped_count} skipped)")
+            except Exception as e:
+                error_msg = f"Failed to save reading cache: {e}"
+                task.add_log("CACHE_UPDATE", "ERROR", error_msg, {
+                    "exception": str(e),
+                    "cache_path": str(cache_path)
+                })
+                logging.error(error_msg)
+        else:
+            if skipped_count > 0:
+                task.add_log("CACHE_UPDATE", "INFO", f"No new papers to add to reading cache ({skipped_count} papers already exist)")
+            else:
+                task.add_log("CACHE_UPDATE", "INFO", "No completed papers to add to reading cache")
+

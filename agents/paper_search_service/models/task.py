@@ -3,6 +3,8 @@ from enum import Enum
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 import json
+import fcntl  # For file locking on Unix systems
+import time
 from pathlib import Path
 
 
@@ -27,8 +29,9 @@ class PaperStatus(str, Enum):
     PENDING = "pending"
     FORMATTING = "formatting"
     SEARCHING = "searching"
+    SEARCH_COMPLETED = "search_completed"  # New: search done, ready for analysis
     ANALYZING = "analyzing"
-    COMPLETED = "completed"
+    COMPLETED = "completed"  # Fully completed (both search and analysis)
     FAILED = "failed"
 
 
@@ -149,35 +152,56 @@ class TaskStorage:
             self.tasks = {}
     
     def _save_tasks(self):
-        try:
-            # Convert tasks to serializable format
-            serializable_tasks = {}
-            for task_id, task in self.tasks.items():
-                task_dict = task.dict()
-                # Convert datetime objects to ISO format strings
-                for key, value in task_dict.items():
-                    if isinstance(value, datetime):
-                        task_dict[key] = value.isoformat()
-                # Handle papers list
-                if 'papers' in task_dict:
-                    for paper in task_dict['papers']:
-                        for paper_key, paper_value in paper.items():
-                            if isinstance(paper_value, datetime):
-                                paper[paper_key] = paper_value.isoformat()
+        """Save tasks with file locking to prevent concurrent access issues"""
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Convert tasks to serializable format
+                serializable_tasks = {}
+                for task_id, task in self.tasks.items():
+                    task_dict = task.dict()
+                    # Convert datetime objects to ISO format strings
+                    for key, value in task_dict.items():
+                        if isinstance(value, datetime):
+                            task_dict[key] = value.isoformat()
+                    # Handle papers list
+                    if 'papers' in task_dict:
+                        for paper in task_dict['papers']:
+                            for paper_key, paper_value in paper.items():
+                                if isinstance(paper_value, datetime):
+                                    paper[paper_key] = paper_value.isoformat()
+                    
+                    # Handle logs list
+                    if 'logs' in task_dict:
+                        for log in task_dict['logs']:
+                            for log_key, log_value in log.items():
+                                if isinstance(log_value, datetime):
+                                    log[log_key] = log_value.isoformat()
+                    
+                    serializable_tasks[task_id] = task_dict
                 
-                # Handle logs list
-                if 'logs' in task_dict:
-                    for log in task_dict['logs']:
-                        for log_key, log_value in log.items():
-                            if isinstance(log_value, datetime):
-                                log[log_key] = log_value.isoformat()
-                
-                serializable_tasks[task_id] = task_dict
-            
-            with open(self.tasks_file, "w", encoding='utf-8') as f:
-                json.dump(serializable_tasks, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"Error saving tasks: {e}")
+                # Use file locking for atomic writes (Unix/macOS)
+                try:
+                    with open(self.tasks_file, "w", encoding='utf-8') as f:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Exclusive lock
+                        json.dump(serializable_tasks, f, indent=2, ensure_ascii=False)
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # Release lock
+                    break  # Success, exit retry loop
+                except (OSError, IOError) as lock_error:
+                    # Handle systems without fcntl (like Windows) or lock contention
+                    if attempt == max_retries - 1:
+                        # Last attempt, try without locking
+                        with open(self.tasks_file, "w", encoding='utf-8') as f:
+                            json.dump(serializable_tasks, f, indent=2, ensure_ascii=False)
+                    else:
+                        # Wait and retry
+                        time.sleep(0.1 * (attempt + 1))
+                        continue
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    print(f"Error saving tasks after {max_retries} attempts: {e}")
+                else:
+                    time.sleep(0.1 * (attempt + 1))
     
     def create_task(self, title: str, input_text: str, description: Optional[str] = None) -> ProcessingTask:
         import uuid
