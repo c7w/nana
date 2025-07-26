@@ -10,7 +10,7 @@ The input will be a multi-line string, where each line represents a paper. A lin
 - The value of "papers" must be an array of objects.
 - Each object in the array represents a single paper and must have the following keys:
   - "title": (string) The title of the paper.
-  - "url": (string or null) The URL associated with the paper. If no URL is found on the line, this value MUST be `null`.
+  - "url": (string or null) The URL associated with the paper. If no URL is found on the line, this value MUST be `null`. Note that simply `https://arxiv.org/` is not a valid URL for *this* element. It must be `https://arxiv.org/pdf/xxxx.xxxxx`-style. Use your knowledge to decide if the input link is already a PDF link.
 
 # Example
 ## Input Text:
