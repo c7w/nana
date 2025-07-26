@@ -355,8 +355,58 @@ class TaskProcessor:
         completed_analysis = 0
         failed_analysis = 0
         
+        # Load existing cache for checking
+        cache_path = project_root / 'storage' / 'paper_search_agent' / 'cache.json'
+        cache = {}
+        if cache_path.exists():
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    cache = json.load(f)
+                task.add_log("ANALYZE_PAPERS", "INFO", f"Loaded existing cache with {len(cache)} entries", {
+                    "cache_path": str(cache_path),
+                    "cache_entries": len(cache)
+                })
+            except Exception as e:
+                logging.warning(f"Failed to load existing cache: {e}")
+                task.add_log("ANALYZE_PAPERS", "WARNING", f"Failed to load cache: {e}")
+                cache = {}
+        
         for i, paper in papers_to_analyze:
             try:
+                # Check if analysis already exists in cache
+                cache_key = _normalize_title(paper.title)
+                if cache_key in cache and 'summary_path' in cache[cache_key]:
+                    # Found existing analysis in cache
+                    cached_summary_path = cache[cache_key]['summary_path']
+                    full_summary_path = project_root / cached_summary_path
+                    
+                    if full_summary_path.exists():
+                        # Use cached analysis
+                        paper.progress['analysis'] = {"summary_path": str(cached_summary_path)}
+                        paper.status = PaperStatus.COMPLETED
+                        completed_analysis += 1
+                        
+                        task.add_log("ANALYZE_PAPERS", "INFO", f"Found cached analysis for paper {i+1}: {paper.title[:100]}...", {
+                            "paper_index": i,
+                            "paper_title": paper.title,
+                            "cache_key": cache_key,
+                            "cached_summary_path": cached_summary_path,
+                            "cache_hit": True
+                        })
+                        logging.info(f"Cache hit for analysis: {paper.title}")
+                        paper.updated_at = datetime.now(timezone.utc)
+                        self.task_storage.update_task(task)
+                        continue
+                    else:
+                        # Cache entry exists but file is missing, proceed with analysis
+                        task.add_log("ANALYZE_PAPERS", "WARNING", f"Cache entry exists but file missing for paper {i+1}: {paper.title[:100]}...", {
+                            "paper_index": i,
+                            "paper_title": paper.title,
+                            "cache_key": cache_key,
+                            "missing_file": str(full_summary_path),
+                            "cache_miss": True
+                        })
+
                 paper.status = PaperStatus.ANALYZING
                 paper.updated_at = datetime.now(timezone.utc)
                 
@@ -364,7 +414,8 @@ class TaskProcessor:
                     "paper_index": i,
                     "paper_title": paper.title,
                     "paper_url": paper.url,
-                    "has_search_data": 'search' in paper.progress
+                    "has_search_data": 'search' in paper.progress,
+                    "cache_checked": True
                 })
                 self.task_storage.update_task(task)
                 

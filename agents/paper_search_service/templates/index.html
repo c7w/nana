@@ -48,87 +48,87 @@
 
     <!-- Reading Page -->
     <div id="readingPage" class="page-content active">
-        <div class="container">
-            <!-- Header -->
-            <header class="header">
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
                 <h1>📚 Paper Research Interface</h1>
-                <p>Search for papers collected by the agent. Only papers with AI-generated summaries are shown.</p>
-            </header>
+            <p>Search for papers collected by the agent. Only papers with AI-generated summaries are shown.</p>
+        </header>
 
-            <!-- Controls - Block 1: 论文选择 -->
-            <div class="controls">
-                <div class="search-section">
-                    <input type="text" id="searchInput" placeholder="Type to search for papers by ID, title, or date..." />
-                    <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
-                </div>
-                <div class="paper-list-container">
-                    <select id="paperSelect" size="5">
-                        <option value="">Loading papers...</option>
-                    </select>
-                    <div class="paper-count">
-                        <span id="paperCount">Loading...</span>
-                    </div>
+        <!-- Controls - Block 1: 论文选择 -->
+        <div class="controls">
+            <div class="search-section">
+                <input type="text" id="searchInput" placeholder="Type to search for papers by ID, title, or date..." />
+                <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+            <div class="paper-list-container">
+                <select id="paperSelect" size="5">
+                    <option value="">Loading papers...</option>
+                </select>
+                <div class="paper-count">
+                    <span id="paperCount">Loading...</span>
                 </div>
             </div>
+        </div>
 
-            <!-- Block 2: PDF和AI摘要 (90vh 90vw) -->
-            <div class="main-content">
-                <div class="content-panels" id="contentPanels">
-                    <!-- PDF Panel -->
-                    <div class="panel pdf-panel" id="pdfPanel">
-                        <div class="panel-header">
-                            <h3>📄 PDF Viewer</h3>
-                        </div>
-                        <div class="panel-content">
-                            <div id="pdfViewer" class="pdf-viewer">
-                                <div class="empty-state">
-                                    Select a paper to view its PDF
-                                </div>
-                            </div>
-                        </div>
+        <!-- Block 2: PDF和AI摘要 (90vh 90vw) -->
+        <div class="main-content">
+            <div class="content-panels" id="contentPanels">
+                <!-- PDF Panel -->
+                <div class="panel pdf-panel" id="pdfPanel">
+                    <div class="panel-header">
+                        <h3>📄 PDF Viewer</h3>
                     </div>
-
-                    <!-- Resizer -->
-                    <div class="resizer" id="resizer"></div>
-
-                    <!-- Summary Panel -->
-                    <div class="panel summary-panel" id="summaryPanel">
-                        <div class="panel-header">
-                            <h3>🤖 AI Summary</h3>
-                        </div>
-                        <div class="panel-content">
-                            <div id="summaryViewer" class="summary-viewer">
-                                <div class="empty-state">
-                                    Select a paper to view its AI summary
-                                </div>
+                    <div class="panel-content">
+                        <div id="pdfViewer" class="pdf-viewer">
+                            <div class="empty-state">
+                                Select a paper to view its PDF
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Block 3: 聊天功能 -->
-            <div class="chat-section" id="chatSection">
-                <div class="chat-header">
-                    <h3>💬 Chat with PDF</h3>
+                <!-- Resizer -->
+                <div class="resizer" id="resizer"></div>
+
+                <!-- Summary Panel -->
+                <div class="panel summary-panel" id="summaryPanel">
+                    <div class="panel-header">
+                        <h3>🤖 AI Summary</h3>
+                    </div>
+                    <div class="panel-content">
+                        <div id="summaryViewer" class="summary-viewer">
+                            <div class="empty-state">
+                                Select a paper to view its AI summary
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Block 3: 聊天功能 -->
+        <div class="chat-section" id="chatSection">
+            <div class="chat-header">
+                <h3>💬 Chat with PDF</h3>
+            </div>
+            
+            <div class="chat-content">
+                <!-- Chat Messages -->
+                <div id="chatMessages" class="chat-messages">
+                    <div class="welcome-message">
+                        <p>🤖 Select a paper to start chatting!</p>
+                        <div class="suggested-questions" id="suggestedQuestions">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="chat-content">
-                    <!-- Chat Messages -->
-                    <div id="chatMessages" class="chat-messages">
-                        <div class="welcome-message">
-                            <p>🤖 Select a paper to start chatting!</p>
-                            <div class="suggested-questions" id="suggestedQuestions">
-                                <!-- Will be populated by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Chat Input -->
-                    <div class="chat-input-area">
-                        <div class="chat-input-container">
-                            <input type="text" id="chatInput" placeholder="Ask a question about this paper..." disabled />
-                            <button id="sendChatBtn" class="btn btn-primary" disabled>Send</button>
+                <!-- Chat Input -->
+                <div class="chat-input-area">
+                    <div class="chat-input-container">
+                        <input type="text" id="chatInput" placeholder="Ask a question about this paper..." disabled />
+                        <button id="sendChatBtn" class="btn btn-primary" disabled>Send</button>
                         </div>
                     </div>
                 </div>

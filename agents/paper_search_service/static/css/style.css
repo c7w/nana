@@ -1158,19 +1158,19 @@ body {
         width: 95vw;
         height: 85vh;
     }
-    
+
     .pdf-panel, .summary-panel {
         flex: 1;
     }
-    
+
     .resizer {
         width: 2px;
     }
-    
+
     .paper-list-container {
         flex-direction: column;
     }
-    
+
     .search-section {
         flex-direction: column;
     }
@@ -1974,4 +1974,4 @@ body {
         font-size: 0.7em;
         padding: 3px 6px;
     }
-}
+} 
