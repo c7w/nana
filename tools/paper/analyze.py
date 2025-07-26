@@ -22,6 +22,14 @@ def _get_pdf_content_as_base64(pdf_url: str) -> str | None:
         response = requests.get(pdf_url, timeout=30)
         response.raise_for_status()
         
+        # Check file size (limit to 10MB)
+        file_size = len(response.content)
+        max_size = 10 * 1024 * 1024  # 10MB in bytes
+        
+        if file_size > max_size:
+            logging.warning(f"PDF at {pdf_url} is too large ({file_size / 1024 / 1024:.1f}MB). Max size is {max_size / 1024 / 1024}MB.")
+            return None
+        
         # Check if the content is actually a PDF
         if 'application/pdf' not in response.headers.get('Content-Type', ''):
             logging.warning(f"URL did not return a PDF. Content-Type: {response.headers.get('Content-Type')}")
@@ -33,6 +41,7 @@ def _get_pdf_content_as_base64(pdf_url: str) -> str | None:
                 pdf_reader = PyPDF2.PdfReader(pdf_file)
                 if len(pdf_reader.pages) > 0:
                      # Re-read the bytes for base64 encoding
+                    logging.info(f"PDF size: {file_size / 1024 / 1024:.1f}MB, Pages: {len(pdf_reader.pages)}")
                     return base64.b64encode(response.content).decode('utf-8')
                 else:
                     logging.warning(f"PDF at {pdf_url} is empty or corrupted.")
@@ -86,7 +95,9 @@ def analyze_paper(paper_info: dict, config: dict, usage_tracker: dict) -> dict |
         }
     ]
     logging.info(f"Requesting summary from '{summary_llm_config['model']}'...")
-    message, usage = call_llm(summary_llm_config, summary_messages, is_json=False)
+    
+    plugins = [{"id": "file-parser", "pdf": {"engine": "pdf-text"}}]
+    message, usage = call_llm(summary_llm_config, summary_messages, is_json=False, plugins=plugins)
     
     update_usage(usage_tracker, summary_llm_config, usage)
 
@@ -103,4 +114,4 @@ def analyze_paper(paper_info: dict, config: dict, usage_tracker: dict) -> dict |
             return None
     else:
         logging.error(f"LLM analysis failed for '{paper_info['title']}'. Message structure: {message}")
-        return None 
+        return None
