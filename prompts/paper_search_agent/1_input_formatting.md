@@ -35,4 +35,8 @@ Generative Pre-training of Diffusion Models
 }
 ```
 
+Bad cases:
+- Spacetime gaussian feature splatting for real-time dynamic view synthesisCCF A
+  - Shall be `Spacetime gaussian feature splatting for real-time dynamic view synthesis`
+
 Now, take the user's input and generate the JSON object. Do not add any explanations or apologies. Output ONLY the JSON object.

@@ -407,70 +407,11 @@ class TaskProcessor:
                             "cache_miss": True
                         })
 
-                paper.status = PaperStatus.ANALYZING
-                paper.updated_at = datetime.now(timezone.utc)
-                
-                task.add_log("ANALYZE_PAPERS", "INFO", f"Starting analysis for paper {i+1}/{len(papers_to_analyze)}: {paper.title[:100]}...", {
-                    "paper_index": i,
-                    "paper_title": paper.title,
-                    "paper_url": paper.url,
-                    "has_search_data": 'search' in paper.progress,
-                    "cache_checked": True
-                })
-                self.task_storage.update_task(task)
-                
-                paper_dict = {"title": paper.title, "url": paper.url, **paper.progress.get('search', {})}
-                
-                try:
-                    analysis_results = analyze_paper(paper_dict, self.config, self.usage_tracker)
-                    
-                    if analysis_results:
-                        paper_id = paper_dict.get('arxiv_id', f'paper_{i}')
-                        paper_dir = analysis_dir / paper_id
-                        paper_dir.mkdir(parents=True, exist_ok=True)
-                        summary_path = paper_dir / 'summary.md'
-                        
-                        with open(summary_path, 'w', encoding='utf-8') as f:
-                            f.write(analysis_results['summary'])
-                        
-                        paper.progress['analysis'] = {"summary_path": str(summary_path.relative_to(project_root))}
-                        paper.status = PaperStatus.COMPLETED
-                        completed_analysis += 1
-                        
-                        task.add_log("ANALYZE_PAPERS", "INFO", f"Successfully analyzed paper {i+1}: {paper.title[:100]}...", {
-                            "paper_index": i,
-                            "paper_title": paper.title,
-                            "paper_id": paper_id,
-                            "summary_path": str(summary_path.relative_to(project_root)),
-                            "summary_length": len(analysis_results['summary']),
-                            "analysis_keys": list(analysis_results.keys()) if isinstance(analysis_results, dict) else []
-                        })
-                        logging.info(f"Analyzed: {paper.title}")
-                    else:
-                        paper.status = PaperStatus.FAILED
-                        paper.error = "Failed to analyze paper"
-                        failed_analysis += 1
-                        task.add_log("ANALYZE_PAPERS", "WARNING", f"Analysis returned no results for paper {i+1}: {paper.title[:100]}...", {
-                            "paper_index": i,
-                            "paper_title": paper.title,
-                            "error": "Analysis function returned empty/null result"
-                        })
-                        logging.warning(f"Failed to analyze: {paper.title}")
-                except Exception as analysis_error:
-                    error_msg = f"Analysis function error for {paper.title}: {analysis_error}"
-                    task.add_log("ANALYZE_PAPERS", "ERROR", f"Analysis function failed for paper {i+1}: {paper.title[:100]}...", {
-                        "paper_index": i,
-                        "paper_title": paper.title,
-                        "exception": str(analysis_error),
-                        "error_type": type(analysis_error).__name__
-                    })
-                    paper.status = PaperStatus.FAILED
-                    paper.error = str(analysis_error)
+                # Use the new analysis method with immediate cache update
+                if self._analyze_single_paper_with_retry(task, paper, i, analysis_dir, cache):
+                    completed_analysis += 1
+                else:
                     failed_analysis += 1
-                    logging.error(error_msg)
-                
-                paper.updated_at = datetime.now(timezone.utc)
-                self.task_storage.update_task(task)
                 
             except Exception as e:
                 error_msg = f"Error analyzing paper {paper.title}: {e}"
@@ -487,11 +428,36 @@ class TaskProcessor:
                 failed_analysis += 1
                 self.task_storage.update_task(task)
         
+        # Retry failed papers
+        retry_completed = 0
+        for i, paper in papers_to_analyze:
+            if self._should_retry_paper(paper):
+                task.add_log("ANALYZE_PAPERS", "INFO", f"Starting retry for failed paper {i+1}: {paper.title[:100]}...", {
+                    "paper_index": i,
+                    "paper_title": paper.title,
+                    "retry_attempt": paper.progress.get('retry_count', 0) + 1
+                })
+                
+                if self._analyze_single_paper_with_retry(task, paper, i, analysis_dir, cache):
+                    retry_completed += 1
+                    if paper.status == PaperStatus.COMPLETED:
+                        completed_analysis += 1
+                        failed_analysis -= 1
+        
+        # Log retry results
+        if retry_completed > 0:
+            task.add_log("ANALYZE_PAPERS", "INFO", f"Retry completed: {retry_completed} papers were retried", {
+                "retry_completed": retry_completed,
+                "final_completed": completed_analysis,
+                "final_failed": failed_analysis
+            })
+        
         # Log overall analysis results
         task.add_log("ANALYZE_PAPERS", "INFO", f"Analysis stage completed: {completed_analysis} successful, {failed_analysis} failed", {
             "successful_analysis": completed_analysis,
             "failed_analysis": failed_analysis,
-            "total_attempted": len(papers_to_analyze)
+            "total_attempted": len(papers_to_analyze),
+            "immediate_cache_updates": "enabled"
         })
 
     def get_task_status(self, task_id: str) -> Dict[str, Any]:
@@ -614,6 +580,224 @@ class TaskProcessor:
                 task.add_log("CACHE_UPDATE", "INFO", f"No new papers to add to reading cache ({skipped_count} papers already exist)")
             else:
                 task.add_log("CACHE_UPDATE", "INFO", "No completed papers to add to reading cache")
+
+    def _update_single_paper_to_cache(self, task: ProcessingTask, paper: PaperTask) -> bool:
+        """Immediately update a single completed paper to the reading cache"""
+        import json
+        
+        if paper.status != PaperStatus.COMPLETED or 'search' not in paper.progress or 'analysis' not in paper.progress:
+            return False
+        
+        # Path to the reading page cache
+        cache_path = project_root / 'storage' / 'paper_search_agent' / 'cache.json'
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Load existing cache
+        cache = {}
+        if cache_path.exists():
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    cache = json.load(f)
+            except Exception as e:
+                logging.warning(f"Failed to load existing cache for single paper update: {e}")
+                cache = {}
+        
+        # Normalize title for cache key
+        cache_key = _normalize_title(paper.title)
+        
+        # Check if paper already exists in cache
+        if cache_key in cache and 'summary_path' in cache[cache_key]:
+            task.add_log("CACHE_UPDATE", "INFO", f"Paper already exists in cache, skipping: {paper.title[:100]}...", {
+                "paper_title": paper.title,
+                "cache_key": cache_key,
+                "existing_summary_path": cache[cache_key]['summary_path']
+            })
+            return True
+        
+        # Create cache entry
+        cache_entry = {
+            "title": paper.title,
+            "url": paper.url,
+            "collected_at": task.created_at.isoformat(),
+            **paper.progress['search'],  # Include search metadata
+            "summary_path": paper.progress['analysis']['summary_path']
+        }
+        
+        cache[cache_key] = cache_entry
+        
+        # Save updated cache immediately
+        try:
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(cache, f, indent=2, ensure_ascii=False)
+            
+            task.add_log("CACHE_UPDATE", "INFO", f"Immediately added paper to reading cache: {paper.title[:100]}...", {
+                "paper_title": paper.title,
+                "cache_key": cache_key,
+                "summary_path": paper.progress['analysis']['summary_path'],
+                "cache_path": str(cache_path)
+            })
+            return True
+            
+        except Exception as e:
+            task.add_log("CACHE_UPDATE", "ERROR", f"Failed to save cache for paper: {paper.title[:100]}...", {
+                "paper_title": paper.title,
+                "cache_key": cache_key,
+                "error": str(e),
+                "cache_path": str(cache_path)
+            })
+            return False
+
+    def _should_retry_paper(self, paper: PaperTask, max_retries: int = 2) -> bool:
+        """Check if a paper should be retried based on failure reason and retry count"""
+        if paper.status != PaperStatus.FAILED:
+            return False
+        
+        # Get retry count from progress
+        retry_count = paper.progress.get('retry_count', 0)
+        
+        # Check if we haven't exceeded max retries
+        if retry_count >= max_retries:
+            return False
+        
+        # Check if error is retryable (avoid retrying permanent failures)
+        if paper.error:
+            error_msg = paper.error.lower()
+            # Don't retry if it's a permanent error
+            if any(permanent_error in error_msg for permanent_error in [
+                'not found', 'does not exist', '404', 'invalid url', 'malformed'
+            ]):
+                return False
+        
+        return True
+    
+    def _retry_paper_analysis(self, task: ProcessingTask, paper: PaperTask, paper_index: int, analysis_dir: Path, cache: dict):
+        """Retry analysis for a failed paper"""
+        # Increment retry count
+        retry_count = paper.progress.get('retry_count', 0) + 1
+        paper.progress['retry_count'] = retry_count
+        
+        task.add_log("ANALYZE_PAPERS", "INFO", f"Retrying analysis for paper {paper_index+1} (attempt {retry_count}): {paper.title[:100]}...", {
+            "paper_index": paper_index,
+            "paper_title": paper.title,
+            "retry_attempt": retry_count,
+            "previous_error": paper.error
+        })
+        
+        # Reset status and error for retry
+        paper.status = PaperStatus.ANALYZING
+        paper.error = None
+        paper.updated_at = datetime.now(timezone.utc)
+        
+        return self._analyze_single_paper_with_retry(task, paper, paper_index, analysis_dir, cache)
+    
+    def _analyze_single_paper_with_retry(self, task: ProcessingTask, paper: PaperTask, paper_index: int, analysis_dir: Path, cache: dict) -> bool:
+        """Analyze a single paper with immediate cache update and return success status"""
+        try:
+            paper.status = PaperStatus.ANALYZING
+            paper.updated_at = datetime.now(timezone.utc)
+            
+            task.add_log("ANALYZE_PAPERS", "INFO", f"Analyzing paper {paper_index+1}: {paper.title[:100]}...", {
+                "paper_index": paper_index,
+                "paper_title": paper.title,
+                "paper_url": paper.url,
+                "has_search_data": 'search' in paper.progress,
+                "retry_count": paper.progress.get('retry_count', 0)
+            })
+            self.task_storage.update_task(task)
+            
+            paper_dict = {"title": paper.title, "url": paper.url, **paper.progress.get('search', {})}
+            
+            try:
+                analysis_results = analyze_paper(paper_dict, self.config, self.usage_tracker)
+                
+                if analysis_results:
+                    paper_id = paper_dict.get('arxiv_id', f'paper_{paper_index}')
+                    paper_dir = analysis_dir / paper_id
+                    paper_dir.mkdir(parents=True, exist_ok=True)
+                    summary_path = paper_dir / 'summary.md'
+                    
+                    with open(summary_path, 'w', encoding='utf-8') as f:
+                        f.write(analysis_results['summary'])
+                    
+                    paper.progress['analysis'] = {"summary_path": str(summary_path.relative_to(project_root))}
+                    paper.status = PaperStatus.COMPLETED
+                    paper.updated_at = datetime.now(timezone.utc)
+                    
+                    task.add_log("ANALYZE_PAPERS", "INFO", f"Successfully analyzed paper {paper_index+1}: {paper.title[:100]}...", {
+                        "paper_index": paper_index,
+                        "paper_title": paper.title,
+                        "paper_id": paper_id,
+                        "summary_path": str(summary_path.relative_to(project_root)),
+                        "summary_length": len(analysis_results['summary']),
+                        "retry_count": paper.progress.get('retry_count', 0)
+                    })
+                    
+                    # Immediately update cache after successful analysis
+                    cache_updated = self._update_single_paper_to_cache(task, paper)
+                    if cache_updated:
+                        task.add_log("ANALYZE_PAPERS", "INFO", f"Paper {paper_index+1} immediately added to cache", {
+                            "paper_index": paper_index,
+                            "paper_title": paper.title,
+                            "cache_updated": True
+                        })
+                    
+                    # Update task storage after completing the paper
+                    self.task_storage.update_task(task)
+                    
+                    logging.info(f"Analyzed and cached: {paper.title}")
+                    return True
+                    
+                else:
+                    paper.status = PaperStatus.FAILED
+                    paper.error = "Analysis function returned empty/null result"
+                    paper.updated_at = datetime.now(timezone.utc)
+                    
+                    task.add_log("ANALYZE_PAPERS", "WARNING", f"Analysis returned no results for paper {paper_index+1}: {paper.title[:100]}...", {
+                        "paper_index": paper_index,
+                        "paper_title": paper.title,
+                        "error": "Analysis function returned empty/null result",
+                        "retry_count": paper.progress.get('retry_count', 0)
+                    })
+                    
+                    self.task_storage.update_task(task)
+                    logging.warning(f"Failed to analyze: {paper.title}")
+                    return False
+                    
+            except Exception as analysis_error:
+                error_msg = f"Analysis function error for {paper.title}: {analysis_error}"
+                paper.status = PaperStatus.FAILED
+                paper.error = str(analysis_error)
+                paper.updated_at = datetime.now(timezone.utc)
+                
+                task.add_log("ANALYZE_PAPERS", "ERROR", f"Analysis function failed for paper {paper_index+1}: {paper.title[:100]}...", {
+                    "paper_index": paper_index,
+                    "paper_title": paper.title,
+                    "exception": str(analysis_error),
+                    "error_type": type(analysis_error).__name__,
+                    "retry_count": paper.progress.get('retry_count', 0)
+                })
+                
+                self.task_storage.update_task(task)
+                logging.error(error_msg)
+                return False
+                
+        except Exception as e:
+            error_msg = f"Unexpected error analyzing paper {paper.title}: {e}"
+            paper.status = PaperStatus.FAILED
+            paper.error = str(e)
+            paper.updated_at = datetime.now(timezone.utc)
+            
+            task.add_log("ANALYZE_PAPERS", "ERROR", f"Unexpected error during analysis of paper {paper_index+1}: {paper.title[:100]}...", {
+                "paper_index": paper_index,
+                "paper_title": paper.title,
+                "exception": str(e),
+                "error_type": type(e).__name__,
+                "retry_count": paper.progress.get('retry_count', 0)
+            })
+            
+            self.task_storage.update_task(task)
+            logging.error(error_msg)
+            return False
     
     def is_task_processing(self, task_id: str) -> bool:
         """Check if a task is currently being processed"""

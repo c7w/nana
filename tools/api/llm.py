@@ -29,6 +29,10 @@ def call_llm(llm_config: dict, messages: list, is_json: bool = False, plugins: l
         "messages": messages
     }
 
+    # Add max_tokens if specified in config
+    if 'max_tokens' in llm_config and llm_config['max_tokens']:
+        payload["max_tokens"] = llm_config['max_tokens']
+
     if is_json:
         payload["response_format"] = {"type": "json_object"}
     
