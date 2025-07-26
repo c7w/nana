@@ -218,6 +218,11 @@ class TaskStorage:
         self._save_tasks()
         return task
     
+    def add_task(self, task: ProcessingTask):
+        """Add an existing ProcessingTask instance to storage"""
+        self.tasks[task.id] = task
+        self._save_tasks()
+
     def get_task(self, task_id: str) -> Optional[ProcessingTask]:
         return self.tasks.get(task_id)
     

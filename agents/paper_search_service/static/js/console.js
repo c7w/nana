@@ -6,7 +6,7 @@
 class ConsoleManager {
     constructor() {
         this.autoRefreshInterval = null;
-        this.autoRefreshEnabled = false; // 关闭自动刷新
+        this.autoRefreshEnabled = true; // 启用自动刷新以观察自动调度的任务状态
         this.refreshIntervalMs = 10000; // 10 seconds
         this.currentTasks = new Map();
         this.init();
@@ -82,8 +82,8 @@ class ConsoleManager {
             document.getElementById('paperList').value = '';
             document.getElementById('taskDescription').value = '';
 
-            // Start processing the task
-            await this.startTaskProcessing(task.id);
+            // Task will be automatically processed by the scheduler
+            this.showMessage('Task created successfully! Processing will start automatically.', 'success');
             
             // Refresh task list
             this.loadTasks();
@@ -98,22 +98,7 @@ class ConsoleManager {
         }
     }
 
-    async startTaskProcessing(taskId) {
-        try {
-            const response = await fetch(`/api/tasks/${taskId}/process`, {
-                method: 'POST'
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            this.showMessage('Task processing started!', 'success');
-        } catch (error) {
-            console.error('Error starting task processing:', error);
-            this.showMessage(`Failed to start processing: ${error.message}`, 'error');
-        }
-    }
+    // startTaskProcessing method removed - tasks are now automatically processed by the scheduler
 
     async loadTasks() {
         try {

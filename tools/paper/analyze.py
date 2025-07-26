@@ -93,14 +93,14 @@ def analyze_paper(paper_info: dict, config: dict, usage_tracker: dict) -> dict |
     if message and 'content' in message:
         analysis_content = message['content']
         # The prompt asks for a structured markdown, so we just check for content.
-        if analysis_content.strip():
-            logging.info(f"Successfully analyzed '{paper_info['title']}'.")
+        if analysis_content and analysis_content.strip():
+            logging.info(f"Successfully analyzed '{paper_info['title']}'. Summary length: {len(analysis_content)} characters.")
             return {
                 'summary': analysis_content,
             }
         else:
-            logging.error(f"LLM returned an empty analysis for '{paper_info['title']}'.")
+            logging.error(f"LLM returned an empty analysis for '{paper_info['title']}'. Response was: '{analysis_content}'")
             return None
-    
-    logging.error(f"LLM analysis failed for '{paper_info['title']}'.")
-    return None 
+    else:
+        logging.error(f"LLM analysis failed for '{paper_info['title']}'. Message structure: {message}")
+        return None 

@@ -1,7 +1,6 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import asyncio
 from pathlib import Path
 import sys
 
@@ -14,9 +13,9 @@ from models.task import ProcessingTask
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
-# Initialize task processor
+# Initialize task processor (simplified, no concurrency parameters)
 storage_dir = Path(__file__).resolve().parent.parent / "storage" / "tasks"
-task_processor = TaskProcessor(storage_dir, max_search_concurrent=3, max_analysis_concurrent=1)
+task_processor = TaskProcessor(storage_dir)
 
 class CreateTaskRequest(BaseModel):
     title: str
@@ -30,8 +29,8 @@ class TaskResponse(BaseModel):
     progress: Dict[str, Any]
     created_at: str
     updated_at: str
-    completed_at: Optional[str]
-    error: Optional[str]
+    completed_at: Optional[str] = None
+    error: Optional[str] = None
 
 class TaskListResponse(BaseModel):
     tasks: List[TaskResponse]
@@ -43,42 +42,54 @@ class TaskDetailResponse(BaseModel):
     progress: Dict[str, Any]
     created_at: str
     updated_at: str
-    completed_at: Optional[str]
-    error: Optional[str]
+    completed_at: Optional[str] = None
+    error: Optional[str] = None
     papers: List[Dict[str, Any]]
 
 class TaskLogsResponse(BaseModel):
-    id: str
-    title: str
+    task_id: str
     logs: List[Dict[str, Any]]
 
 @router.post("/", response_model=TaskResponse)
 async def create_task(request: CreateTaskRequest):
-    """Create a new paper processing task"""
+    """Create a new task and add it to the processing queue"""
     try:
-        task = task_processor.task_storage.create_task(
+        import uuid
+        task = ProcessingTask(
+            id=str(uuid.uuid4()),
             title=request.title,
             input_text=request.input_text,
             description=request.description
         )
+        task_processor.task_storage.add_task(task)
         
-        task_data = task_processor.get_task_status(task.id)
-        return TaskResponse(**task_data)
+        # Task will be automatically picked up by the scheduler
+        return TaskResponse(
+            id=task.id,
+            title=task.title,
+            status=task.status,
+            progress=task.get_progress_summary(),
+            created_at=task.created_at.isoformat(),
+            updated_at=task.updated_at.isoformat(),
+            completed_at=task.completed_at.isoformat() if task.completed_at else None,
+            error=task.error
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create task: {str(e)}")
 
 @router.get("/", response_model=TaskListResponse)
-async def list_tasks():
-    """Get list of all tasks"""
+async def get_tasks():
+    """Get all tasks"""
     try:
         tasks_data = task_processor.get_all_tasks()
-        return TaskListResponse(tasks=[TaskResponse(**task) for task in tasks_data])
+        tasks = [TaskResponse(**task_data) for task_data in tasks_data]
+        return TaskListResponse(tasks=tasks)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list tasks: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get tasks: {str(e)}")
 
 @router.get("/{task_id}", response_model=TaskDetailResponse)
 async def get_task(task_id: str):
-    """Get detailed task information"""
+    """Get detailed information about a specific task"""
     try:
         task_data = task_processor.get_task_status(task_id)
         if "error" in task_data and task_data["error"] == "Task not found":
@@ -89,32 +100,6 @@ async def get_task(task_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get task: {str(e)}")
 
-@router.post("/{task_id}/process")
-async def start_processing(task_id: str, background_tasks: BackgroundTasks):
-    """Start processing a task in the background"""
-    try:
-        task = task_processor.task_storage.get_task(task_id)
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        
-        # Enhanced status check - be more specific about what states are acceptable
-        if task.status != "pending":
-            if task.status in ["formatting_input", "searching_papers", "analyzing_papers"]:
-                raise HTTPException(status_code=409, detail=f"Task is already being processed (status: {task.status})")
-            elif task.status in ["completed", "failed"]:
-                raise HTTPException(status_code=410, detail=f"Task has already finished (status: {task.status})")
-            else:
-                raise HTTPException(status_code=400, detail=f"Task is not in pending status (current: {task.status})")
-        
-        # Start processing in background
-        background_tasks.add_task(task_processor.process_task_sync, task_id)
-        
-        return {"message": "Task processing started", "task_id": task_id}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start processing: {str(e)}")
-
 @router.get("/{task_id}/logs", response_model=TaskLogsResponse)
 async def get_task_logs(task_id: str):
     """Get detailed logs for a task"""
@@ -123,8 +108,7 @@ async def get_task_logs(task_id: str):
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        # Convert logs to serializable format
-        logs_data = []
+        logs = []
         for log in task.logs:
             log_dict = {
                 "timestamp": log.timestamp.isoformat(),
@@ -133,13 +117,9 @@ async def get_task_logs(task_id: str):
                 "message": log.message,
                 "data": log.data
             }
-            logs_data.append(log_dict)
+            logs.append(log_dict)
         
-        return TaskLogsResponse(
-            id=task.id,
-            title=task.title,
-            logs=logs_data
-        )
+        return TaskLogsResponse(task_id=task_id, logs=logs)
     except HTTPException:
         raise
     except Exception as e:
@@ -149,11 +129,26 @@ async def get_task_logs(task_id: str):
 async def delete_task(task_id: str):
     """Delete a task"""
     try:
-        success = task_processor.task_storage.delete_task(task_id)
-        if not success:
+        task = task_processor.task_storage.get_task(task_id)
+        if not task:
             raise HTTPException(status_code=404, detail="Task not found")
-        return {"message": "Task deleted successfully"}
+        
+        # Check if task is currently being processed
+        if task_processor.is_task_processing(task_id):
+            raise HTTPException(status_code=409, detail="Cannot delete task that is currently being processed")
+        
+        task_processor.task_storage.delete_task(task_id)
+        return {"message": f"Task {task_id} deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete task: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to delete task: {str(e)}")
+
+@router.get("/system/stats")
+async def get_system_stats():
+    """Get system processing statistics"""
+    try:
+        stats = task_processor.get_processing_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get system stats: {str(e)}") 
