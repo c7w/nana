@@ -1,7 +1,25 @@
-你好！这里是公告区域
+## 【开发 TODO】
+
+- [ ] 一个浏览器插件，可以直接收录 arXiv paper 到本系统。
+- [ ] 对大文件的支持
+- [ ] 对论文打 tagging
 
 
-这里支持代码块
+## 【系统帮助】
+
+帮助你快速做 **文献调研** 的一个系统 :)
+
+使用流程：
+
+1. 新建任务。填写任务名和任务接收的字段（比如下面是我在 google scholar 某个 paper 的“引用”里找出来的）
+2. openai/gpt-4.1 会从中抽取论文标题
+3. 会调用 arXiv 和 openalex 的搜索引擎去试着在 arXiv 上找到这个工作
+4. google/gemini-2.5-pro 会去为每个paper生成summary，生成完就可以在左边的 paper list 里面看到了！:)
+
+注意 Paper 的大小不要超过 5M，不然处理的时候会有问题。
+
+
+下面是一个示例输入：
 
 ```text
 Echo chamber: Rl post-training amplifies behaviors learned in pretrainingPreprint
@@ -66,7 +84,3 @@ capabilities of vision-language models (VLMs). However, enhancing policy explora
 ```
 
 
-还要支持**加粗**和*斜体*
-
-
-希望前端能正常渲染。

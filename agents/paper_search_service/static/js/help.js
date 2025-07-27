@@ -12,8 +12,17 @@ class HelpManager {
 
     init() {
         this.setupEventListeners();
-        this.loadHelpContent();
         this.initialized = true;
+        console.log('Help manager ready for initialization');
+    }
+
+    // 手动加载内容的方法
+    loadContent() {
+        if (!this.content) {
+            this.loadHelpContent();
+        } else {
+            this.displayContent();
+        }
     }
 
     setupEventListeners() {
@@ -134,3 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = HelpManager;
 }
+
+// Make HelpManager available globally in browser
+window.HelpManager = HelpManager;

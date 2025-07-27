@@ -87,11 +87,10 @@ class NavigationManager {
                 }
                 break;
             case 'console':
-                break;
-a            case 'help':
-a                this.initializeHelpPage();
-a                break;
                 this.initializeConsolePage();
+                break;
+            case 'help':
+                this.initializeHelpPage();
                 break;
         }
     }
@@ -101,16 +100,23 @@ a                break;
         if (!window.consoleManager && window.ConsoleManager) {
             window.consoleManager = new ConsoleManager();
         }
+        console.log('Console page initialized');
+    }
 
     initializeHelpPage() {
         // Initialize help manager if not already done
         if (!window.helpManager && window.HelpManager) {
             window.helpManager = new HelpManager();
         }
+        
+        // Load content when switching to help page
+        if (window.helpManager && typeof window.helpManager.loadContent === 'function') {
+            window.helpManager.loadContent();
+        }
+        
         console.log('Help page initialized');
     }
-        console.log('Console page initialized');
-    }
+
 
     toggleTheme() {
         this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
