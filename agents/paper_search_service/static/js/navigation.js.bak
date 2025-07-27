@@ -74,7 +74,7 @@ class NavigationManager {
 
     handleHashChange() {
         const hash = window.location.hash.slice(1) || 'reading';
-        const page = ['reading', 'console', 'help'].includes(hash) ? hash : 'reading';
+        const page = ['reading', 'console'].includes(hash) ? hash : 'reading';
         this.navigateToPage(page);
     }
 
@@ -87,10 +87,6 @@ class NavigationManager {
                 }
                 break;
             case 'console':
-                break;
-a            case 'help':
-a                this.initializeHelpPage();
-a                break;
                 this.initializeConsolePage();
                 break;
         }
@@ -101,14 +97,6 @@ a                break;
         if (!window.consoleManager && window.ConsoleManager) {
             window.consoleManager = new ConsoleManager();
         }
-
-    initializeHelpPage() {
-        // Initialize help manager if not already done
-        if (!window.helpManager && window.HelpManager) {
-            window.helpManager = new HelpManager();
-        }
-        console.log('Help page initialized');
-    }
         console.log('Console page initialized');
     }
 

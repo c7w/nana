@@ -35,9 +35,6 @@
                 <li class="nav-item">
                     <a href="#console" class="nav-link" data-page="console">⚙️ Console</a>
                 </li>
-                <li class="nav-item">
-                    <a href="#help" class="nav-link" data-page="help">❓ Help</a>
-                </li>
             </ul>
             
             <div class="navbar-actions">
@@ -210,41 +207,6 @@
         </div>
     </div>
 
-
-    <!-- Help Page -->
-    <div id="helpPage" class="page-content">
-        <div class="help-page">
-            <div class="help-header">
-                <div class="header-content">
-                    <h1>❓ Help & Documentation</h1>
-                    <p>Usage guide and system information</p>
-                </div>
-                <div class="header-actions">
-                    <button id="refreshHelp" class="btn btn-secondary">
-                        <span class="icon">🔄</span>
-                        Refresh
-                    </button>
-                </div>
-            </div>
-            
-            <div class="help-content">
-                <div class="help-container">
-                    <div id="helpLoading" class="loading-state">
-                        <div class="loading-spinner"></div>
-                        <div class="loading-text">Loading help content...</div>
-                    </div>
-                    <div id="helpContentArea" class="help-content-area" style="display: none;">
-                        <!-- Markdown content will be rendered here -->
-                    </div>
-                    <div id="helpError" class="error-state" style="display: none;">
-                        <div class="error-message">
-                            ❌ Failed to load help content. Please try refreshing the page.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay" style="display: none;">
         <div class="loading-spinner"></div>

@@ -1975,3 +1975,205 @@ body {
         padding: 3px 6px;
     }
 } 
+/* ================================
+   Help Page Styles
+   ================================ */
+
+.help-page {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-color);
+}
+
+.help-header {
+    background: var(--surface-color);
+    border-bottom: 1px solid var(--border-color);
+    padding: 2rem;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.help-header .header-content h1 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color);
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.help-header .header-content p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+.help-content {
+    flex: 1;
+    overflow: hidden;
+    padding: 2rem;
+}
+
+.help-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.help-content-area {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 1rem;
+}
+
+/* Markdown content styling */
+.help-content-area h1,
+.help-content-area h2,
+.help-content-area h3,
+.help-content-area h4,
+.help-content-area h5,
+.help-content-area h6 {
+    color: var(--text-color);
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.help-content-area h1 {
+    font-size: 2rem;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+.help-content-area h2 {
+    font-size: 1.5rem;
+    color: var(--primary-color);
+}
+
+.help-content-area h3 {
+    font-size: 1.3rem;
+}
+
+.help-content-area p {
+    color: var(--text-color);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.help-content-area strong {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.help-content-area em {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.help-content-area code {
+    background: var(--code-bg);
+    color: var(--code-color);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9rem;
+}
+
+.help-content-area pre {
+    background: var(--code-bg);
+    color: var(--code-color);
+    padding: 1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    border: 1px solid var(--border-color);
+}
+
+.help-content-area pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+
+.help-content-area ul,
+.help-content-area ol {
+    color: var(--text-color);
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+.help-content-area li {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+
+.help-content-area blockquote {
+    border-left: 4px solid var(--primary-color);
+    background: var(--surface-alt);
+    padding: 1rem;
+    margin: 1rem 0;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.help-content-area table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.help-content-area th,
+.help-content-area td {
+    border: 1px solid var(--border-color);
+    padding: 0.75rem;
+    text-align: left;
+}
+
+.help-content-area th {
+    background: var(--surface-alt);
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+.help-content-area td {
+    color: var(--text-color);
+}
+
+/* Error and loading states */
+.help-content-area .error-state,
+.help-content-area .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    color: var(--text-muted);
+}
+
+.help-content-area .error-message {
+    font-size: 1.1rem;
+    color: var(--error-color);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .help-header {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .help-content {
+        padding: 1rem;
+    }
+    
+    .help-content-area {
+        padding: 1rem;
+    }
+}
