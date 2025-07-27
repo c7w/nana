@@ -16,18 +16,6 @@
 - **核心贡献**：论文最主要的创新点是什么？是提出了新模型、新算法、新数据集，还是新的理论视角？
 - **关键结果**：通过实验，论文得出了哪些关键的、可量化的结论？（例如：在某某任务上提升了X%的性能）
 
-### 2.1 回答下列问题
-
-- Feedback/Rewards Type of the agent (language or numerical)
-
-- Feedback/Rewards Source: How does the feedback/reward generated?
-
-- How to update models? (RL, SFT, In-Context Learning)
-
-- Which parts of models are updated (full paras, context, partial paras, tools)
-
-- When? (pre-testtime, testtime)
-
 ## 3. 方法详解 (Methodology Explained)
 - **技术路径**：简述作者为解决问题所采取的整体技术思路。
 - **模型/算法细节**：（这里请关注原文的部分）
